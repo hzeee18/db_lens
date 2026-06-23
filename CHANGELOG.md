@@ -1,3 +1,7 @@
+## 0.0.3
+
+* Add screenshots to pub.dev listing
+
 ## 0.0.2
 
 * Support SharedPreferences as a data source with key, type, value columns

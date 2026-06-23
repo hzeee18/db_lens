@@ -1,3 +1,10 @@
+## 0.0.2
+
+* Support SharedPreferences as a data source with key, type, value columns
+* Add SQLite raw query support
+* Add search across all data sources
+* Add refresh support
+
 ## 0.0.1
 
 * Initial release
@@ -7,3 +14,5 @@
 * Long-press to copy cell value
 * Multiple database support
 * Auto-hidden in release builds
+
+

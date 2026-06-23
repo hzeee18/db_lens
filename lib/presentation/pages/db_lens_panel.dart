@@ -2,7 +2,6 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:share_plus/share_plus.dart';
 
 import '../../core/models/db_lens_config.dart';
 import '../../db_lens_facade.dart';
@@ -153,78 +152,6 @@ class _DbLensPanelState extends State<DbLensPanel> {
     if (!mounted || json == null) return;
     await Clipboard.setData(ClipboardData(text: json));
     _showSnackBar('Copied all rows as JSON');
-  }
-
-  Future<void> _exportAsExcel() async {
-    final collection = _controller.selectedCollection ?? 'export';
-    final bytes = await _controller.exportAsExcelBytes(sheetName: collection);
-    if (!mounted || bytes == null) return;
-    final fileName =
-        '${collection}_${DateTime.now().millisecondsSinceEpoch}.xlsx';
-    await Share.shareXFiles(
-      [
-        XFile.fromData(
-          Uint8List.fromList(bytes),
-          mimeType:
-              'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-          name: fileName,
-        ),
-      ],
-      subject: 'DB Lens export',
-    );
-  }
-
-  Future<void> _showExportMenu() async {
-    if (!_controller.canExport) return;
-
-    await showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: _theme.bg,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(14)),
-      ),
-      builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: Icon(Icons.content_copy, color: _theme.accent),
-              title: const Text('Copy all as JSON'),
-              onTap: () {
-                Navigator.pop(context);
-                _copyAllAsJson();
-              },
-            ),
-            ListTile(
-              leading: Icon(
-                Icons.table_view_outlined,
-                color: _controller.supportsExcelExport
-                    ? _theme.accent
-                    : _theme.textMuted,
-              ),
-              title: Text(
-                'Export as Excel',
-                style: TextStyle(
-                  color: _controller.supportsExcelExport
-                      ? _theme.textPrimary
-                      : _theme.textMuted,
-                ),
-              ),
-              subtitle: _controller.supportsExcelExport
-                  ? null
-                  : const Text('Not available for SharedPreferences'),
-              enabled: _controller.supportsExcelExport,
-              onTap: _controller.supportsExcelExport
-                  ? () {
-                      Navigator.pop(context);
-                      _exportAsExcel();
-                    }
-                  : null,
-            ),
-          ],
-        ),
-      ),
-    );
   }
 
   Future<void> _showEditCellDialog({
@@ -845,8 +772,8 @@ class _DbLensPanelState extends State<DbLensPanel> {
               icon: Icon(Icons.content_copy, size: 18, color: _theme.accent),
             ),
           IconButton(
-            tooltip: 'Export',
-            onPressed: c.canExport && !c.exporting ? _showExportMenu : null,
+            tooltip: 'Copy all as JSON',
+            onPressed: c.canCopyJson && !c.exporting ? _copyAllAsJson : null,
             visualDensity: VisualDensity.compact,
             icon: c.exporting
                 ? SizedBox(
@@ -857,8 +784,7 @@ class _DbLensPanelState extends State<DbLensPanel> {
                       color: _theme.accent,
                     ),
                   )
-                : Icon(Icons.ios_share_outlined,
-                    size: 18, color: _theme.accent),
+                : Icon(Icons.content_copy, size: 18, color: _theme.accent),
           ),
           IconButton(
             tooltip: 'Refresh',

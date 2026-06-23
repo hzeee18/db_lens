@@ -1,6 +1,5 @@
 import 'dart:convert';
 
-import 'package:excel/excel.dart';
 import 'package:flutter/foundation.dart';
 
 import '../../core/enums/source_type.dart';
@@ -124,12 +123,7 @@ class DbLensController extends ChangeNotifier {
           ? _repository.getSourceType(selectedSourceId!)
           : null;
 
-  bool get supportsExcelExport =>
-      selectedSourceType == SourceType.sqlite &&
-      !queryMode &&
-      selectedCollection != null;
-
-  bool get canExport =>
+  bool get canCopyJson =>
       !exporting &&
       !loading &&
       (queryMode
@@ -516,7 +510,7 @@ class DbLensController extends ChangeNotifier {
   }
 
   Future<String?> copyAllAsJson() async {
-    if (!canExport) return null;
+    if (!canCopyJson) return null;
     exporting = true;
     notifyListeners();
     try {
@@ -533,56 +527,6 @@ class DbLensController extends ChangeNotifier {
       notifyListeners();
       return null;
     }
-  }
-
-  Future<List<int>?> exportAsExcelBytes({required String sheetName}) async {
-    if (!supportsExcelExport || !canExport) return null;
-    exporting = true;
-    notifyListeners();
-    try {
-      final rows = await _fetchAllActiveRows();
-      final cols = displayColumns;
-      final excel = Excel.createExcel();
-      final defaultSheet = excel.getDefaultSheet() ?? 'Sheet1';
-      excel.rename(defaultSheet, sheetName);
-      final sheet = excel[sheetName];
-
-      for (var c = 0; c < cols.length; c++) {
-        sheet
-            .cell(CellIndex.indexByColumnRow(columnIndex: c, rowIndex: 0))
-            .value = TextCellValue(cols[c]);
-      }
-
-      for (var r = 0; r < rows.length; r++) {
-        final row = rows[r];
-        for (var c = 0; c < cols.length; c++) {
-          final value = row[cols[c]];
-          sheet
-              .cell(CellIndex.indexByColumnRow(columnIndex: c, rowIndex: r + 1))
-              .value = _excelCellValue(value);
-        }
-      }
-
-      final bytes = excel.encode();
-      exporting = false;
-      notifyListeners();
-      return bytes;
-    } catch (error) {
-      exporting = false;
-      lastError = 'Failed to export Excel: $error';
-      notifyListeners();
-      return null;
-    }
-  }
-
-  CellValue? _excelCellValue(Object? value) {
-    if (value == null) return null;
-    if (value is bool) return BoolCellValue(value);
-    if (value is int) return IntCellValue(value);
-    if (value is double) return DoubleCellValue(value);
-    if (value is num) return DoubleCellValue(value.toDouble());
-    if (value is List) return TextCellValue(value.toString());
-    return TextCellValue(value.toString());
   }
 
   // ── Query ─────────────────────────────────────────────────────────────────

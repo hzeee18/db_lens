@@ -103,7 +103,7 @@ Switch between sources inside the panel. Search and filter source and collection
 | 🎨 | Table / JSON view toggle — current page as pretty-printed JSON array |
 | 📋 | Tap row → JSON bottom sheet; long-press → copy or edit cell |
 | ✏️ | Edit cell values (SQLite `UPDATE` / SharedPreferences `set*`) |
-| 📤 | Export — copy all as JSON; export SQLite to Excel (`.xlsx`) |
+| 📤 | Copy all rows as JSON |
 | 🎨 | `DbLensThemeData` — customizable panel colors |
 | 🔄 | Refresh on demand |
 | 💾 | Multiple source support |

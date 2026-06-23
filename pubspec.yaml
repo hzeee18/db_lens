@@ -4,14 +4,6 @@ version: 0.0.3
 repository: https://github.com/hzeee18/db_lens
 homepage: https://github.com/hzeee18/db_lens
 
-screenshots:
-  - description: 'SQLite browser'
-    path: screenshots/preview_sqlite.png
-  - description: 'Pagination'
-    path: screenshots/preview_pagination.png
-  - description: 'SharedPreferences inspector'
-    path: screenshots/preview_sharedprefs.png
-
 environment:
   sdk: '>=3.0.0 <4.0.0'
   flutter: '>=3.7.0'

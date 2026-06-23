@@ -1,6 +1,8 @@
 # db_lens 🔍
 
-A Flutter debug tool for QA and developers to inspect SQLite (sqflite) and SharedPreferences directly on device — no external tools, no adb, no VS Code needed.
+A Flutter debug tool for inspecting SQLite and SharedPreferences directly on device — no adb, no external tools, no laptop needed.
+
+> Designed for QA and developers. Works out of the box.
 
 ---
 
@@ -8,7 +10,7 @@ A Flutter debug tool for QA and developers to inspect SQLite (sqflite) and Share
 
 | SQLite Browser | Pagination | SharedPreferences |
 |:-:|:-:|:-:|
-| ![SQLite](screenshots/preview_sqlite.png) | ![Pagination](screenshots/preview_pagination.png) | ![SharedPreferences](screenshots/preview_sharedprefs.png) |
+| <img src="screenshots/preview_sqlite.png" width="200"/> | <img src="screenshots/preview_pagination.png" width="200"/> | <img src="screenshots/preview_sharedprefs.png" width="200"/> |
 
 ---
 
@@ -16,14 +18,12 @@ A Flutter debug tool for QA and developers to inspect SQLite (sqflite) and Share
 
 ```yaml
 dev_dependencies:
-  db_lens: ^0.0.2
+  db_lens: ^0.0.3
 ```
 
 ---
 
-## Usage
-
-### 1. Register your database
+## Quick Start
 
 ```dart
 import 'package:db_lens/db_lens.dart';
@@ -35,29 +35,27 @@ DbLens.register('Main DB', db);
 // SharedPreferences
 final prefs = await SharedPreferences.getInstance();
 DbLens.registerSharedPreferences('App Prefs', prefs);
+
+// Open the inspector
+DbLens.open(context);
 ```
 
-### 2a. Use the ready-made button
+---
 
-Drop `DbLensButton` anywhere — drawer, settings page, debug menu, etc.
+## DbLensButton
+
+Drop it anywhere — app bar, drawer, debug menu, settings page.
 
 ```dart
-import 'package:db_lens/db_lens.dart';
-
 // Default
 DbLensButton()
 
 // Custom
 DbLensButton(
-  label: 'Inspect Database',
+  label: 'Inspect Data',
   icon: Icons.bug_report,
+  style: ElevatedButton.styleFrom(backgroundColor: Colors.teal),
 )
-```
-
-### 2b. Or open manually
-
-```dart
-DbLens.open(context);
 ```
 
 ---
@@ -70,19 +68,19 @@ DbLens.register('Cache DB', cacheDb);
 DbLens.registerSharedPreferences('App Prefs', prefs);
 ```
 
-Switch between them inside the panel.
+Switch between sources inside the panel.
 
 ---
 
 ## Features
 
-- 🔍 Browse SQLite tables and SharedPreferences
-- 🗄️ SharedPreferences inspector with key, type, and value columns
-- 🔎 Search rows across all columns
-- 📄 Pagination (10 rows/page)
-- 🛠️ Raw SQL query support
-- 🔄 Refresh data on demand
-- 📋 Long-press cell to copy row as JSON
-- 💾 Multiple source support
-- 🎯 Flexible — use `DbLensButton` or call `DbLens.open(context)` manually
-- 🚫 Auto-hidden in release builds
+| | |
+|---|---|
+| 🗄️ | SQLite table browser |
+| 🔑 | SharedPreferences inspector with key, type & value |
+| 🔎 | Search across all columns |
+| 📄 | Pagination (10 rows/page) |
+| 🛠️ | Raw SQL query support |
+| 🔄 | Refresh on demand |
+| 📋 | Long-press cell to copy row as JSON |
+| 💾 | Multiple source support |

@@ -1,6 +1,6 @@
 name: db_lens
 description: A Flutter debug tool for inspecting SQLite (sqflite) and SharedPreferences directly on device. Built for QA and developers — no external tools or adb needed.
-version: 0.0.3
+version: 0.0.4
 repository: https://github.com/hzeee18/db_lens
 homepage: https://github.com/hzeee18/db_lens
 
@@ -13,6 +13,8 @@ dependencies:
     sdk: flutter
   sqflite: ^2.3.0
   shared_preferences: ^2.3.0
+  excel: ^4.0.6
+  share_plus: ^10.0.0
 
 dev_dependencies:
   flutter_test:

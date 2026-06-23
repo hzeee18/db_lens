@@ -4,12 +4,13 @@ import '../theme/db_lens_theme.dart';
 
 /// Utilitas format, warna, pencarian, dan sort baris di UI.
 abstract final class RowUtils {
-  static Color valueColor(Object? value) {
-    if (value == null) return DbLensTheme.syntaxNull;
-    if (value is bool) return DbLensTheme.syntaxBool;
-    if (value is num) return DbLensTheme.syntaxNumber;
-    if (value is String || value is List<String>) return DbLensTheme.syntaxString;
-    return DbLensTheme.syntaxDefault;
+  static Color valueColor(Object? value, [DbLensTheme? theme]) {
+    final t = theme ?? DbLensTheme();
+    if (value == null) return t.syntaxNull;
+    if (value is bool) return t.syntaxBool;
+    if (value is num) return t.syntaxNumber;
+    if (value is String || value is List<String>) return t.syntaxString;
+    return t.syntaxDefault;
   }
 
   static String formatValue(Object? value) {
@@ -64,5 +65,11 @@ abstract final class RowUtils {
     }
 
     return result;
+  }
+
+  static List<String> filterItems(List<String> items, String query) {
+    final q = query.trim().toLowerCase();
+    if (q.isEmpty) return items;
+    return items.where((item) => item.toLowerCase().contains(q)).toList();
   }
 }

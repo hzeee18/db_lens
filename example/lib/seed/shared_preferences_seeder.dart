@@ -3,7 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// Seeder data demo untuk SharedPreferences di example app.
 abstract final class SharedPreferencesSeeder {
   static const seedVersionKey = '_db_lens_seed_version';
-  static const currentSeedVersion = 1;
+  static const currentSeedVersion = 3;
 
   /// Menulis data sample ke [prefs].
   ///
@@ -17,22 +17,17 @@ abstract final class SharedPreferencesSeeder {
 
     await prefs.setString('app_theme', 'dark');
     await prefs.setString('app_locale', 'id_ID');
-    await prefs.setString('user_display_name', 'Demo User');
-
-    await prefs.setBool('onboarding_done', true);
-    await prefs.setBool('notifications_enabled', false);
-    await prefs.setBool('biometric_login', true);
+    await prefs.setString('user_token', 'demo_token_abc123xyz');
 
     await prefs.setInt('login_count', 42);
-    await prefs.setInt('session_timeout_minutes', 30);
 
-    await prefs.setDouble('last_rating', 4.5);
     await prefs.setDouble('cart_total', 129.99);
+    await prefs.setDouble('last_rating', 4.5);
 
-    await prefs.setStringList(
-      'recent_searches',
-      ['users', 'products', 'settings', 'orders'],
-    );
+    await prefs.setBool('biometric_login', true);
+    await prefs.setBool('onboarding_done', true);
+    await prefs.setBool('notifications_enabled', false);
+
     await prefs.setStringList(
       'favorite_categories',
       ['electronics', 'books', 'food'],
@@ -46,15 +41,13 @@ abstract final class SharedPreferencesSeeder {
     const demoKeys = [
       'app_theme',
       'app_locale',
-      'user_display_name',
+      'user_token',
+      'login_count',
+      'cart_total',
+      'last_rating',
+      'biometric_login',
       'onboarding_done',
       'notifications_enabled',
-      'biometric_login',
-      'login_count',
-      'session_timeout_minutes',
-      'last_rating',
-      'cart_total',
-      'recent_searches',
       'favorite_categories',
     ];
 

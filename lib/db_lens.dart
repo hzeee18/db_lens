@@ -10,4 +10,5 @@ export 'domain/entities/source_entity.dart';
 export 'domain/repositories/lens_repository.dart';
 export 'db_lens_facade.dart';
 export 'presentation/state/db_lens_pagination.dart';
+export 'presentation/theme/db_lens_theme_data.dart';
 export 'presentation/widgets/db_lens_button.dart';

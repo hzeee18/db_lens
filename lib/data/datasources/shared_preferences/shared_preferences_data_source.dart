@@ -81,4 +81,54 @@ class SharedPreferencesDataSource implements LensDataSource {
     if (value is String) return 'String';
     return value?.runtimeType.toString() ?? 'null';
   }
+
+  @override
+  Future<List<Map<String, dynamic>>> allRows(String collection) async =>
+      _allRows();
+
+  @override
+  Future<void> updateCell(
+    String collection,
+    String column,
+    Object? newValue,
+    Map<String, dynamic> row,
+  ) async {
+    final key = row['key'] as String?;
+
+    if (column == 'key') {
+      if (key == null || newValue is! String || newValue.isEmpty) {
+        throw ArgumentError('Invalid key value.');
+      }
+      final currentValue = _preferences.get(key);
+      final typeName = row['type'] as String? ?? _typeName(currentValue);
+      await _preferences.remove(key);
+      await _setValue(newValue, currentValue, typeName);
+      return;
+    }
+
+    if (column != 'value') {
+      throw UnsupportedError('Only key and value columns can be edited.');
+    }
+
+    if (key == null) throw ArgumentError('Row has no key.');
+
+    final typeName = row['type'] as String? ?? _typeName(newValue);
+    await _setValue(key, newValue, typeName);
+  }
+
+  Future<void> _setValue(String key, Object? newValue, String type) async {
+    switch (type) {
+      case 'bool':
+        await _preferences.setBool(key, newValue as bool);
+      case 'int':
+        await _preferences.setInt(key, newValue as int);
+      case 'double':
+        await _preferences.setDouble(key, newValue as double);
+      case 'StringList':
+        await _preferences.setStringList(key, List<String>.from(newValue as List));
+      case 'String':
+      default:
+        await _preferences.setString(key, newValue?.toString() ?? '');
+    }
+  }
 }

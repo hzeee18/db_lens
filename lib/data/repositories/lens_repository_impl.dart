@@ -1,3 +1,4 @@
+import '../../core/enums/source_type.dart';
 import '../../domain/entities/collection_entity.dart';
 import '../../domain/entities/row_entity.dart';
 import '../../domain/entities/source_entity.dart';
@@ -95,5 +96,34 @@ class LensRepositoryImpl implements LensRepository {
   @override
   bool supportsRawSql(String sourceId) {
     return _registry.getSource(sourceId) is SqlQueryableDataSource;
+  }
+
+  @override
+  Future<void> updateCell(
+    String sourceId,
+    String collection,
+    String column,
+    Object? newValue,
+    Map<String, dynamic> row,
+  ) {
+    return _requireSource(sourceId).updateCell(
+      collection,
+      column,
+      newValue,
+      row,
+    );
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> getAllRows(
+    String sourceId,
+    String collection,
+  ) {
+    return _requireSource(sourceId).allRows(collection);
+  }
+
+  @override
+  SourceType? getSourceType(String sourceId) {
+    return _registry.getSource(sourceId)?.sourceType;
   }
 }

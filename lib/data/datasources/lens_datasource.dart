@@ -20,4 +20,15 @@ abstract class LensDataSource {
 
   /// Nama kolom untuk header tabel UI.
   Future<List<String>> columnNames(String collection);
+
+  /// Perbarui nilai satu sel. Implementasi spesifik per engine.
+  Future<void> updateCell(
+    String collection,
+    String column,
+    Object? newValue,
+    Map<String, dynamic> row,
+  );
+
+  /// Ambil semua baris (untuk ekspor).
+  Future<List<Map<String, dynamic>>> allRows(String collection);
 }

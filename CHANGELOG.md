@@ -1,3 +1,16 @@
+## 0.0.4
+
+* Dynamic theme support via `DbLensThemeData` and `DbLensThemeData.fromMaterialTheme()`
+* Searchable source and collection selectors with highlighted matches
+* JSON view mode — toggle current page rows as a pretty-printed JSON array
+* Row JSON bottom sheet — tap a row to inspect; edit full row JSON when editing is allowed
+* Edit cell values (long-press) for SQLite and SharedPreferences
+* Export toolbar — copy all rows as JSON; export SQLite tables to Excel (`.xlsx`) via `share_plus`
+* Raw SQL auto-selects collection from simple `FROM` clause; complex queries stay in custom result view
+* Smooth single-scroll layout using slivers (fixes nested scroll conflicts)
+* `kReleaseMode` guard on `DbLens.open()` and `DbLensButton`
+* Example app showcase with seeded SQLite & SharedPreferences data
+
 ## 0.0.3
 
 * Add screenshots to pub.dev listing
@@ -18,5 +31,3 @@
 * Long-press to copy cell value
 * Multiple database support
 * Auto-hidden in release builds
-
-

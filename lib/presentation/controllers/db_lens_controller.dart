@@ -1,9 +1,14 @@
+import 'dart:convert';
+
+import 'package:excel/excel.dart';
 import 'package:flutter/foundation.dart';
 
+import '../../core/enums/source_type.dart';
 import '../../core/models/db_lens_config.dart';
 import '../../domain/entities/source_entity.dart';
 import '../../domain/repositories/lens_repository.dart';
 import '../../domain/usecases/execute_statement_use_case.dart';
+import '../../domain/usecases/get_all_rows_use_case.dart';
 import '../../domain/usecases/get_collections_use_case.dart';
 import '../../domain/usecases/get_columns_use_case.dart';
 import '../../domain/usecases/get_row_count_use_case.dart';
@@ -11,9 +16,11 @@ import '../../domain/usecases/get_rows_use_case.dart';
 import '../../domain/usecases/get_sources_use_case.dart';
 import '../../domain/usecases/run_raw_query_count_use_case.dart';
 import '../../domain/usecases/run_raw_query_paged_use_case.dart';
+import '../../domain/usecases/update_cell_use_case.dart';
 import '../state/db_lens_pagination.dart';
 import '../../core/utils/sql_utils.dart';
 import '../state/db_lens_panel_models.dart';
+import '../utils/json_view_utils.dart';
 import '../utils/row_utils.dart';
 
 /// Controller presentasi — satu-satunya jembatan UI ke domain layer.
@@ -29,6 +36,8 @@ class DbLensController extends ChangeNotifier {
     required RunRawQueryPagedUseCase runRawQueryPaged,
     required RunRawQueryCountUseCase runRawQueryCount,
     required ExecuteStatementUseCase executeStatement,
+    required UpdateCellUseCase updateCell,
+    required GetAllRowsUseCase getAllRows,
     required LensRepository repository,
     this.config = const DbLensConfig(),
   })  : _getSources = getSources,
@@ -39,6 +48,8 @@ class DbLensController extends ChangeNotifier {
         _runRawQueryPaged = runRawQueryPaged,
         _runRawQueryCount = runRawQueryCount,
         _executeStatement = executeStatement,
+        _updateCell = updateCell,
+        _getAllRows = getAllRows,
         _repository = repository;
 
   final GetSourcesUseCase _getSources;
@@ -49,6 +60,8 @@ class DbLensController extends ChangeNotifier {
   final RunRawQueryPagedUseCase _runRawQueryPaged;
   final RunRawQueryCountUseCase _runRawQueryCount;
   final ExecuteStatementUseCase _executeStatement;
+  final UpdateCellUseCase _updateCell;
+  final GetAllRowsUseCase _getAllRows;
   final LensRepository _repository;
 
   final DbLensConfig config;
@@ -71,8 +84,12 @@ class DbLensController extends ChangeNotifier {
   bool runningQuery = false;
   bool queryMode = false;
   bool queryExpanded = false;
+  bool queryCustomResult = false;
+  bool exporting = false;
 
   String searchText = '';
+  String sourceSearchText = '';
+  String collectionSearchText = '';
   String? sortColumn;
   bool sortAscending = true;
   String? queryError;
@@ -88,6 +105,12 @@ class DbLensController extends ChangeNotifier {
 
   List<String> get sourceNames => sources.map((s) => s.name).toList();
 
+  List<String> get filteredSourceNames =>
+      RowUtils.filterItems(sourceNames, sourceSearchText);
+
+  List<String> get filteredCollections =>
+      RowUtils.filterItems(collections, collectionSearchText);
+
   String? get selectedSourceName {
     if (selectedSourceId == null) return null;
     for (final source in sources) {
@@ -96,9 +119,34 @@ class DbLensController extends ChangeNotifier {
     return null;
   }
 
+  SourceType? get selectedSourceType =>
+      selectedSourceId != null
+          ? _repository.getSourceType(selectedSourceId!)
+          : null;
+
+  bool get supportsExcelExport =>
+      selectedSourceType == SourceType.sqlite &&
+      !queryMode &&
+      selectedCollection != null;
+
+  bool get canExport =>
+      !exporting &&
+      !loading &&
+      (queryMode
+          ? activeRows.isNotEmpty || activeRowCount > 0
+          : selectedCollection != null);
+
+  bool get canEditCells =>
+      !queryMode && !queryCustomResult && selectedCollection != null;
+
   List<Map<String, Object?>> get activeRows => pagination?.rows ?? const [];
 
-  List<String> get activeColumns => queryMode ? queryColumns : columns;
+  List<String> get activeColumns {
+    final cols = queryMode ? queryColumns : columns;
+    return cols.where((c) => c != '_rowid_').toList();
+  }
+
+  List<String> get displayColumns => activeColumns;
 
   int get activeRowCount => pagination?.totalRows ?? 0;
 
@@ -108,7 +156,7 @@ class DbLensController extends ChangeNotifier {
       selectedSourceId != null && _repository.supportsRawSql(selectedSourceId!);
 
   bool get canRefresh {
-    if (loading || runningQuery) return false;
+    if (loading || runningQuery || exporting) return false;
     if (queryMode) return queryText.trim().isNotEmpty;
     if (selectedCollection == null) return false;
     return !(pagination?.isLoading ?? false);
@@ -155,6 +203,8 @@ class DbLensController extends ChangeNotifier {
 
   Future<void> selectSource(String sourceId) async {
     selectedSourceId = sourceId;
+    sourceSearchText = '';
+    collectionSearchText = '';
     notifyListeners();
     await loadCollections(sourceId);
   }
@@ -181,6 +231,7 @@ class DbLensController extends ChangeNotifier {
 
   Future<void> selectCollection(String collection) async {
     selectedCollection = collection;
+    collectionSearchText = '';
     notifyListeners();
     await loadCollection(collection);
   }
@@ -245,6 +296,16 @@ class DbLensController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setSourceSearchText(String value) {
+    sourceSearchText = value;
+    notifyListeners();
+  }
+
+  void setCollectionSearchText(String value) {
+    collectionSearchText = value;
+    notifyListeners();
+  }
+
   void clearSearch() {
     searchText = '';
     notifyListeners();
@@ -293,6 +354,237 @@ class DbLensController extends ChangeNotifier {
     notifyListeners();
   }
 
+  // ── Cell edit ─────────────────────────────────────────────────────────────
+
+  Future<bool> updateCellValue({
+    required String column,
+    required Object? newValue,
+    required Map<String, Object?> row,
+  }) async {
+    final sourceId = selectedSourceId;
+    final collection = selectedCollection;
+    if (sourceId == null || collection == null || !canEditCells) return false;
+
+    try {
+      await _updateCell(sourceId, collection, column, newValue, row);
+      await refresh();
+      return true;
+    } catch (error) {
+      lastError = 'Failed to update cell: $error';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Perbarui baris dari map JSON hasil edit. Mengembalikan pesan error atau null jika sukses.
+  Future<String?> updateRowFromJson(
+    Map<String, Object?> originalRow,
+    Map<String, Object?> updatedRow,
+  ) async {
+    final sourceId = selectedSourceId;
+    final collection = selectedCollection;
+    if (sourceId == null || collection == null || !canEditCells) {
+      return 'Editing is not available in this view.';
+    }
+
+    final original = Map<String, Object?>.from(originalRow);
+    final originalDisplay = JsonViewUtils.prepareRow(original);
+    final updated = Map<String, Object?>.from(updatedRow)..remove('_rowid_');
+
+    final validationError = _validateRowUpdate(original, updated);
+    if (validationError != null) return validationError;
+
+    final changedColumns = <String>[];
+    for (final key in originalDisplay.keys) {
+      if (!updated.containsKey(key)) continue;
+      if (!_valuesEqual(originalDisplay[key], updated[key])) {
+        changedColumns.add(key);
+      }
+    }
+
+    if (changedColumns.isEmpty) return null;
+
+    try {
+      for (final column in changedColumns) {
+        await _updateCell(
+          sourceId,
+          collection,
+          column,
+          updated[column],
+          original,
+        );
+      }
+      await refresh();
+      return null;
+    } catch (error) {
+      return 'Failed to update row: $error';
+    }
+  }
+
+  String? _validateRowUpdate(
+    Map<String, Object?> original,
+    Map<String, Object?> updated,
+  ) {
+    if (selectedSourceType == SourceType.sharedPreferences) {
+      return _validateSharedPreferencesRowUpdate(original, updated);
+    }
+    return null;
+  }
+
+  String? _validateSharedPreferencesRowUpdate(
+    Map<String, Object?> original,
+    Map<String, Object?> updated,
+  ) {
+    final expectedType = original['type'] as String?;
+    if (expectedType == null) return null;
+
+    if (updated.containsKey('type') &&
+        updated['type']?.toString() != original['type']?.toString()) {
+      return 'Cannot change the type field (expected "$expectedType").';
+    }
+
+    if (updated.containsKey('key') && updated['key'] is! String) {
+      return 'Key must be a string.';
+    }
+
+    if (updated.containsKey('value')) {
+      final newValue = updated['value'];
+      if (!_valueMatchesPrefType(newValue, expectedType)) {
+        return 'Value must remain $expectedType '
+            '(got ${_describeValueType(newValue)}).';
+      }
+    }
+
+    return null;
+  }
+
+  bool _valueMatchesPrefType(Object? value, String type) {
+    switch (type) {
+      case 'bool':
+        return value is bool;
+      case 'int':
+        return value is int;
+      case 'double':
+        return value is double || value is int;
+      case 'String':
+        return value is String;
+      case 'StringList':
+        return value is List && value.every((e) => e is String);
+      default:
+        return true;
+    }
+  }
+
+  String _describeValueType(Object? value) {
+    if (value == null) return 'null';
+    if (value is List) return 'List';
+    return value.runtimeType.toString();
+  }
+
+  bool _valuesEqual(Object? a, Object? b) {
+    if (a is List && b is List) {
+      return a.length == b.length &&
+          List.generate(a.length, (i) => _valuesEqual(a[i], b[i]))
+              .every((e) => e);
+    }
+    return a == b;
+  }
+
+  // ── Export & JSON view ────────────────────────────────────────────────────
+
+  /// Ambil semua baris aktif tanpa pagination (untuk JSON view & export).
+  Future<List<Map<String, Object?>>> allRows() => _fetchAllActiveRows();
+
+  Future<List<Map<String, Object?>>> _fetchAllActiveRows() async {
+    final sourceId = selectedSourceId;
+    if (sourceId == null) return [];
+
+    if (queryMode && queryText.trim().isNotEmpty) {
+      final total = await _runRawQueryCount(sourceId, queryText.trim());
+      if (total == 0) return [];
+      return _runRawQueryPaged(
+        sourceId,
+        queryText.trim(),
+        limit: total,
+        offset: 0,
+      );
+    }
+
+    final collection = selectedCollection;
+    if (collection == null) return [];
+    return _getAllRows(sourceId, collection);
+  }
+
+  Future<String?> copyAllAsJson() async {
+    if (!canExport) return null;
+    exporting = true;
+    notifyListeners();
+    try {
+      final rows = await _fetchAllActiveRows();
+      final exportRows = rows
+          .map((row) => Map<String, Object?>.from(row)..remove('_rowid_'))
+          .toList();
+      exporting = false;
+      notifyListeners();
+      return jsonEncode(exportRows);
+    } catch (error) {
+      exporting = false;
+      lastError = 'Failed to copy JSON: $error';
+      notifyListeners();
+      return null;
+    }
+  }
+
+  Future<List<int>?> exportAsExcelBytes({required String sheetName}) async {
+    if (!supportsExcelExport || !canExport) return null;
+    exporting = true;
+    notifyListeners();
+    try {
+      final rows = await _fetchAllActiveRows();
+      final cols = displayColumns;
+      final excel = Excel.createExcel();
+      final defaultSheet = excel.getDefaultSheet() ?? 'Sheet1';
+      excel.rename(defaultSheet, sheetName);
+      final sheet = excel[sheetName];
+
+      for (var c = 0; c < cols.length; c++) {
+        sheet
+            .cell(CellIndex.indexByColumnRow(columnIndex: c, rowIndex: 0))
+            .value = TextCellValue(cols[c]);
+      }
+
+      for (var r = 0; r < rows.length; r++) {
+        final row = rows[r];
+        for (var c = 0; c < cols.length; c++) {
+          final value = row[cols[c]];
+          sheet
+              .cell(CellIndex.indexByColumnRow(columnIndex: c, rowIndex: r + 1))
+              .value = _excelCellValue(value);
+        }
+      }
+
+      final bytes = excel.encode();
+      exporting = false;
+      notifyListeners();
+      return bytes;
+    } catch (error) {
+      exporting = false;
+      lastError = 'Failed to export Excel: $error';
+      notifyListeners();
+      return null;
+    }
+  }
+
+  CellValue? _excelCellValue(Object? value) {
+    if (value == null) return null;
+    if (value is bool) return BoolCellValue(value);
+    if (value is int) return IntCellValue(value);
+    if (value is double) return DoubleCellValue(value);
+    if (value is num) return DoubleCellValue(value.toDouble());
+    if (value is List) return TextCellValue(value.toString());
+    return TextCellValue(value.toString());
+  }
+
   // ── Query ─────────────────────────────────────────────────────────────────
 
   Future<bool> shouldConfirmQuery() =>
@@ -317,6 +609,19 @@ class DbLensController extends ChangeNotifier {
 
     if (SqlUtils.isSelectQuery(sql)) {
       _cacheTableViewForQuery();
+
+      final detectedTable = SqlUtils.extractSimpleFromTable(sql);
+      final tableExists = detectedTable != null &&
+          collections.any(
+            (c) => c.toLowerCase() == detectedTable.toLowerCase(),
+          );
+      queryCustomResult = !tableExists;
+
+      if (tableExists) {
+        selectedCollection = collections.firstWhere(
+          (c) => c.toLowerCase() == detectedTable.toLowerCase(),
+        );
+      }
 
       late List<String> derivedColumns;
       try {
@@ -363,6 +668,7 @@ class DbLensController extends ChangeNotifier {
       _cacheTableViewForQuery();
       queryColumns = [];
       queryMode = true;
+      queryCustomResult = true;
       queryInfoMessage = 'Query executed successfully. No rows returned.';
       runningQuery = false;
       refreshing = false;
@@ -464,6 +770,7 @@ class DbLensController extends ChangeNotifier {
 
   void _resetQueryState() {
     queryMode = false;
+    queryCustomResult = false;
     queryColumns = [];
     queryError = null;
     queryInfoMessage = null;
@@ -485,4 +792,3 @@ class DbLensController extends ChangeNotifier {
     );
   }
 }
-

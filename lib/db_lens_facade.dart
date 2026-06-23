@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
@@ -8,6 +9,7 @@ import 'data/registry/db_lens_registry.dart';
 import 'data/repositories/lens_repository_impl.dart';
 import 'domain/repositories/lens_repository.dart';
 import 'domain/usecases/execute_statement_use_case.dart';
+import 'domain/usecases/get_all_rows_use_case.dart';
 import 'domain/usecases/get_collections_use_case.dart';
 import 'domain/usecases/get_columns_use_case.dart';
 import 'domain/usecases/get_row_count_use_case.dart';
@@ -15,8 +17,11 @@ import 'domain/usecases/get_rows_use_case.dart';
 import 'domain/usecases/get_sources_use_case.dart';
 import 'domain/usecases/run_raw_query_count_use_case.dart';
 import 'domain/usecases/run_raw_query_paged_use_case.dart';
+import 'domain/usecases/update_cell_use_case.dart';
 import 'presentation/controllers/db_lens_controller.dart';
 import 'presentation/pages/db_lens_panel.dart';
+import 'presentation/theme/db_lens_theme.dart';
+import 'presentation/theme/db_lens_theme_data.dart';
 
 /// Main entry point for DbLens.
 ///
@@ -47,6 +52,10 @@ class DbLens {
       RunRawQueryCountUseCase(_repository);
   static final ExecuteStatementUseCase _executeStatement =
       ExecuteStatementUseCase(_repository);
+  static final UpdateCellUseCase _updateCell =
+      UpdateCellUseCase(_repository);
+  static final GetAllRowsUseCase _getAllRows =
+      GetAllRowsUseCase(_repository);
 
   /// Register a sqflite [database] with a display [name].
   static void register(String name, Database database) {
@@ -61,7 +70,7 @@ class DbLens {
     registry.registerSharedPreferences(name: name, preferences: preferences);
   }
 
-  /// Register a custom [LensDataSource] (Hive, Isar, ObjectBox, etc.).
+  /// Register a custom [LensDataSource] (source).
   static void registerSource(LensDataSource source) {
     registry.registerSource(source);
   }
@@ -95,14 +104,25 @@ class DbLens {
       runRawQueryPaged: _runRawQueryPaged,
       runRawQueryCount: _runRawQueryCount,
       executeStatement: _executeStatement,
+      updateCell: _updateCell,
+      getAllRows: _getAllRows,
       repository: _repository,
       config: config ?? const DbLensConfig(),
     );
   }
 
   /// Open the DbLens panel.
-  static void open(BuildContext context, {DbLensConfig? config}) {
+  ///
+  /// Tidak berjalan di release build ([kReleaseMode]).
+  static void open(
+    BuildContext context, {
+    DbLensConfig? config,
+    DbLensThemeData? theme,
+  }) {
+    if (kReleaseMode) return;
+
     final panelConfig = config ?? const DbLensConfig();
+    final panelTheme = DbLensTheme(theme);
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -110,7 +130,10 @@ class DbLens {
       barrierColor: Colors.black54,
       enableDrag: false,
       useSafeArea: true,
-      builder: (_) => DbLensPanel(config: panelConfig),
+      builder: (_) => DbLensThemeScope(
+        theme: panelTheme,
+        child: DbLensPanel(config: panelConfig),
+      ),
     );
   }
 

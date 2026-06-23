@@ -1,23 +1,26 @@
 import 'package:flutter/material.dart';
 
-/// Shared design tokens for the DB Lens panel (Notion / Linear light mode).
-abstract final class DbLensTheme {
-  static const bg = Color(0xFFFFFFFF);
-  static const surface = Color(0xFFF5F7FA);
-  static const border = Color(0xFFE5E7EB);
+import 'db_lens_theme_data.dart';
 
-  static const textPrimary = Color(0xFF111827);
-  static const textSecondary = Color(0xFF6B7280);
-  static const textMuted = Color(0xFF9CA3AF);
+/// Instance tema yang dapat dikonfigurasi untuk panel DB Lens.
+class DbLensTheme {
+  DbLensTheme([DbLensThemeData? data]) : data = data ?? DbLensThemeData.defaults;
 
-  static const accent = Color(0xFF6366F1);
-  static const accentSoft = Color(0xFFEEF2FF);
+  final DbLensThemeData data;
 
-  static const syntaxNull = Color(0xFF9CA3AF);
-  static const syntaxString = Color(0xFF16A34A);
-  static const syntaxNumber = Color(0xFFD97706);
-  static const syntaxBool = Color(0xFF2563EB);
-  static const syntaxDefault = Color(0xFF111827);
+  Color get bg => data.bg;
+  Color get surface => data.surface;
+  Color get border => data.border;
+  Color get textPrimary => data.textPrimary;
+  Color get textSecondary => data.textSecondary;
+  Color get textMuted => data.textMuted;
+  Color get accent => data.accent;
+  Color get accentSoft => data.accentSoft;
+  Color get syntaxNull => data.syntaxNull;
+  Color get syntaxString => data.syntaxString;
+  Color get syntaxNumber => data.syntaxNumber;
+  Color get syntaxBool => data.syntaxBool;
+  Color get syntaxDefault => data.syntaxDefault;
 
   static const headerFontSize = 11.0;
   static const dataFontSize = 12.5;
@@ -38,7 +41,7 @@ abstract final class DbLensTheme {
     offset: Offset(0, -4),
   );
 
-  static BoxDecoration sheetDecoration({double size = 0}) {
+  BoxDecoration sheetDecoration({double size = 0}) {
     final isFull = size >= 1.0;
     return BoxDecoration(
       color: bg,
@@ -47,7 +50,7 @@ abstract final class DbLensTheme {
           : const BorderRadius.vertical(top: sheetRadius),
       border: isFull
           ? null
-          : const Border(
+          : Border(
               top: BorderSide(color: border),
               left: BorderSide(color: border),
               right: BorderSide(color: border),
@@ -56,31 +59,52 @@ abstract final class DbLensTheme {
     );
   }
 
-  static OutlineInputBorder outlineBorder({Color color = border}) {
+  OutlineInputBorder outlineBorder({Color? color}) {
     return OutlineInputBorder(
       borderRadius: BorderRadius.circular(10),
-      borderSide: BorderSide(color: color),
+      borderSide: BorderSide(color: color ?? border),
     );
   }
 
-  static InputDecoration fieldDecoration({
+  InputDecoration fieldDecoration({
     required String hintText,
     Widget? prefixIcon,
     Widget? suffixIcon,
-    Color fillColor = surface,
+    Color? fillColor,
   }) {
     return InputDecoration(
       hintText: hintText,
-      hintStyle: const TextStyle(color: textSecondary),
+      hintStyle: TextStyle(color: textSecondary),
       prefixIcon: prefixIcon,
       suffixIcon: suffixIcon,
       isDense: true,
       filled: true,
-      fillColor: fillColor,
+      fillColor: fillColor ?? surface,
       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
       border: outlineBorder(),
       enabledBorder: outlineBorder(color: border),
       focusedBorder: outlineBorder(color: accent),
     );
   }
+}
+
+/// Menyediakan [DbLensTheme] ke subtree widget panel.
+class DbLensThemeScope extends InheritedWidget {
+  const DbLensThemeScope({
+    super.key,
+    required this.theme,
+    required super.child,
+  });
+
+  final DbLensTheme theme;
+
+  static DbLensTheme of(BuildContext context) {
+    final scope =
+        context.dependOnInheritedWidgetOfExactType<DbLensThemeScope>();
+    return scope?.theme ?? DbLensTheme();
+  }
+
+  @override
+  bool updateShouldNotify(DbLensThemeScope oldWidget) =>
+      theme.data != oldWidget.theme.data;
 }

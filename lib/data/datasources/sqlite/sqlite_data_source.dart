@@ -45,7 +45,7 @@ class SqliteDataSource implements SqlQueryableDataSource {
     int offset,
   ) async {
     final result = await _database.rawQuery(
-      'SELECT * FROM $collection LIMIT $limit OFFSET $offset',
+      'SELECT rowid AS _rowid_, * FROM $collection LIMIT $limit OFFSET $offset',
     );
     return result.map((row) => Map<String, dynamic>.from(row)).toList();
   }
@@ -93,5 +93,51 @@ class SqliteDataSource implements SqlQueryableDataSource {
   @override
   Future<void> execute(String sql) async {
     await _database.execute(sql);
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> allRows(String collection) async {
+    final result = await _database.rawQuery(
+      'SELECT rowid AS _rowid_, * FROM $collection',
+    );
+    return result.map((row) => Map<String, dynamic>.from(row)).toList();
+  }
+
+  @override
+  Future<void> updateCell(
+    String collection,
+    String column,
+    Object? newValue,
+    Map<String, dynamic> row,
+  ) async {
+    if (column == '_rowid_') {
+      throw UnsupportedError('Cannot edit internal rowid column.');
+    }
+
+    final info = await _database.rawQuery('PRAGMA table_info($collection)');
+    final pkCols = info
+        .where((r) => r['pk'] != null && (r['pk'] as int) > 0)
+        .map((r) => r['name'] as String)
+        .toList();
+
+    late final String where;
+    late final List<Object?> whereArgs;
+
+    if (pkCols.isNotEmpty) {
+      where = pkCols.map((c) => '$c = ?').join(' AND ');
+      whereArgs = pkCols.map((c) => row[c]).toList();
+    } else if (row.containsKey('_rowid_')) {
+      where = 'rowid = ?';
+      whereArgs = [row['_rowid_']];
+    } else {
+      final cols = row.keys.where((k) => k != '_rowid_').toList();
+      where = cols.map((c) => '$c = ?').join(' AND ');
+      whereArgs = cols.map((c) => row[c]).toList();
+    }
+
+    await _database.rawUpdate(
+      'UPDATE $collection SET $column = ? WHERE $where',
+      [newValue, ...whereArgs],
+    );
   }
 }

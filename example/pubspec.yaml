@@ -1,5 +1,6 @@
 name: db_lens_example
 description: Example app demonstrating the db_lens package.
+version: 0.0.4
 publish_to: none
 
 environment:

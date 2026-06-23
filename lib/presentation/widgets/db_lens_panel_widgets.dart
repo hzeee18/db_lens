@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+
 import '../theme/db_lens_theme.dart';
+import 'db_lens_highlighted_text.dart';
 
 class DbLensUnfocusTap extends StatelessWidget {
   const DbLensUnfocusTap({
@@ -29,6 +31,7 @@ class DbLensDragHandleBar extends StatefulWidget {
     required this.maxSize,
     required this.dismissThreshold,
     required this.onDismiss,
+    required this.theme,
   });
 
   final DraggableScrollableController controller;
@@ -36,6 +39,7 @@ class DbLensDragHandleBar extends StatefulWidget {
   final double maxSize;
   final double dismissThreshold;
   final Future<void> Function() onDismiss;
+  final DbLensTheme theme;
 
   @override
   State<DbLensDragHandleBar> createState() => _DbLensDragHandleBarState();
@@ -79,12 +83,12 @@ class _DbLensDragHandleBarState extends State<DbLensDragHandleBar> {
             width: _dragging ? 40 : 32,
             height: _dragging ? 4 : 3,
             decoration: BoxDecoration(
-              color: _dragging ? DbLensTheme.accent : _handleIdle,
+              color: _dragging ? widget.theme.accent : _handleIdle,
               borderRadius: BorderRadius.circular(2),
               boxShadow: _dragging
                   ? [
                       BoxShadow(
-                        color: DbLensTheme.accent.withValues(alpha: 0.25),
+                        color: widget.theme.accent.withValues(alpha: 0.25),
                         blurRadius: 6,
                         offset: const Offset(0, 1),
                       ),
@@ -104,11 +108,15 @@ class DbLensSelectorChip extends StatelessWidget {
     required this.label,
     required this.isSelected,
     required this.onTap,
+    required this.theme,
+    this.highlight = '',
   });
 
   final String label;
   final bool isSelected;
   final VoidCallback onTap;
+  final DbLensTheme theme;
+  final String highlight;
 
   @override
   Widget build(BuildContext context) {
@@ -122,18 +130,19 @@ class DbLensSelectorChip extends StatelessWidget {
           constraints: const BoxConstraints(minHeight: 40),
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
-            color: isSelected ? DbLensTheme.accentSoft : Colors.transparent,
+            color: isSelected ? theme.accentSoft : Colors.transparent,
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
-              color: isSelected ? DbLensTheme.accent : DbLensTheme.border,
+              color: isSelected ? theme.accent : theme.border,
               width: isSelected ? 1.5 : 1,
             ),
           ),
-          child: Text(
-            label,
+          child: DbLensHighlightedText(
+            text: label,
+            highlight: highlight,
+            theme: theme,
             style: TextStyle(
-              color:
-                  isSelected ? DbLensTheme.accent : DbLensTheme.textSecondary,
+              color: isSelected ? theme.accent : theme.textSecondary,
               fontSize: 13,
               fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
               fontFamily: 'monospace',
@@ -153,12 +162,14 @@ class DbLensPaginationButton extends StatelessWidget {
     required this.label,
     required this.enabled,
     required this.onPressed,
+    required this.theme,
   });
 
   final IconData icon;
   final String label;
   final bool enabled;
   final VoidCallback? onPressed;
+  final DbLensTheme theme;
 
   @override
   Widget build(BuildContext context) {
@@ -173,9 +184,9 @@ class DbLensPaginationButton extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
-              color: enabled ? DbLensTheme.bg : Colors.transparent,
+              color: enabled ? theme.bg : Colors.transparent,
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: DbLensTheme.border),
+              border: Border.all(color: theme.border),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
@@ -184,18 +195,14 @@ class DbLensPaginationButton extends StatelessWidget {
                   Icon(
                     icon,
                     size: 18,
-                    color: enabled
-                        ? DbLensTheme.textPrimary
-                        : DbLensTheme.textMuted,
+                    color: enabled ? theme.textPrimary : theme.textMuted,
                   ),
                   const SizedBox(width: 4),
                 ],
                 Text(
                   label,
                   style: TextStyle(
-                    color: enabled
-                        ? DbLensTheme.textPrimary
-                        : DbLensTheme.textMuted,
+                    color: enabled ? theme.textPrimary : theme.textMuted,
                     fontSize: 13,
                     fontWeight: FontWeight.w500,
                   ),
@@ -205,9 +212,7 @@ class DbLensPaginationButton extends StatelessWidget {
                   Icon(
                     icon,
                     size: 18,
-                    color: enabled
-                        ? DbLensTheme.textPrimary
-                        : DbLensTheme.textMuted,
+                    color: enabled ? theme.textPrimary : theme.textMuted,
                   ),
                 ],
               ],
@@ -231,6 +236,7 @@ class DbLensPaginationBar extends StatelessWidget {
     required this.canGoNext,
     required this.onPrevious,
     required this.onNext,
+    required this.theme,
     this.onJumpToPage,
     this.isLoading = false,
   });
@@ -246,6 +252,7 @@ class DbLensPaginationBar extends StatelessWidget {
   final VoidCallback? onNext;
   final Future<void> Function(int page)? onJumpToPage;
   final bool isLoading;
+  final DbLensTheme theme;
 
   Future<void> _showJumpDialog(BuildContext context) async {
     if (onJumpToPage == null) return;
@@ -255,6 +262,7 @@ class DbLensPaginationBar extends StatelessWidget {
       builder: (dialogContext) => _JumpToPageDialog(
         currentPage: page,
         totalPages: totalPages,
+        theme: theme,
       ),
     );
 
@@ -266,9 +274,9 @@ class DbLensPaginationBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 14),
-      decoration: const BoxDecoration(
-        color: DbLensTheme.bg,
-        border: Border(top: BorderSide(color: DbLensTheme.border)),
+      decoration: BoxDecoration(
+        color: theme.bg,
+        border: Border(top: BorderSide(color: theme.border)),
       ),
       child: SafeArea(
         top: false,
@@ -280,6 +288,7 @@ class DbLensPaginationBar extends StatelessWidget {
               label: 'Prev',
               enabled: canGoPrevious && !isLoading,
               onPressed: canGoPrevious && !isLoading ? onPrevious : null,
+              theme: theme,
             ),
             Expanded(
               child: GestureDetector(
@@ -290,12 +299,12 @@ class DbLensPaginationBar extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     if (isLoading)
-                      const SizedBox(
+                      SizedBox(
                         width: 16,
                         height: 16,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          color: DbLensTheme.accent,
+                          color: theme.accent,
                         ),
                       )
                     else
@@ -305,13 +314,13 @@ class DbLensPaginationBar extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                          color: DbLensTheme.textPrimary,
+                          color: theme.textPrimary,
                           fontSize: 13,
                           fontWeight: FontWeight.w500,
                           decoration: onJumpToPage != null
                               ? TextDecoration.underline
                               : TextDecoration.none,
-                          decorationColor: DbLensTheme.textMuted,
+                          decorationColor: theme.textMuted,
                         ),
                       ),
                     const SizedBox(height: 2),
@@ -322,8 +331,8 @@ class DbLensPaginationBar extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        color: DbLensTheme.textMuted,
+                      style: TextStyle(
+                        color: theme.textMuted,
                         fontSize: 11,
                         fontFamily: 'monospace',
                       ),
@@ -337,6 +346,7 @@ class DbLensPaginationBar extends StatelessWidget {
               label: 'Next',
               enabled: canGoNext && !isLoading,
               onPressed: canGoNext && !isLoading ? onNext : null,
+              theme: theme,
             ),
           ],
         ),
@@ -348,17 +358,19 @@ class DbLensPaginationBar extends StatelessWidget {
 class DbLensTablePageSkeleton extends StatelessWidget {
   const DbLensTablePageSkeleton({
     super.key,
+    required this.theme,
     this.rowCount = 8,
     this.columnCount = 4,
   });
 
+  final DbLensTheme theme;
   final int rowCount;
   final int columnCount;
 
   @override
   Widget build(BuildContext context) {
     return ColoredBox(
-      color: DbLensTheme.bg.withValues(alpha: 0.72),
+      color: theme.bg.withValues(alpha: 0.72),
       child: ListView.separated(
         physics: const NeverScrollableScrollPhysics(),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -373,7 +385,7 @@ class DbLensTablePageSkeleton extends StatelessWidget {
                   height: 14,
                   margin: EdgeInsets.only(right: index < columnCount - 1 ? 12 : 0),
                   decoration: BoxDecoration(
-                    color: DbLensTheme.border.withValues(alpha: 0.55),
+                    color: theme.border.withValues(alpha: 0.55),
                     borderRadius: BorderRadius.circular(4),
                   ),
                 ),
@@ -387,7 +399,9 @@ class DbLensTablePageSkeleton extends StatelessWidget {
 }
 
 class DbLensLoadingIndicator extends StatelessWidget {
-  const DbLensLoadingIndicator({super.key});
+  const DbLensLoadingIndicator({super.key, required this.theme});
+
+  final DbLensTheme theme;
 
   @override
   Widget build(BuildContext context) {
@@ -395,11 +409,11 @@ class DbLensLoadingIndicator extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const SizedBox(
+          SizedBox(
             width: 22,
             height: 22,
             child: CircularProgressIndicator(
-              color: DbLensTheme.accent,
+              color: theme.accent,
               strokeWidth: 2,
             ),
           ),
@@ -407,7 +421,7 @@ class DbLensLoadingIndicator extends StatelessWidget {
           Text(
             'Loading…',
             style: TextStyle(
-              color: DbLensTheme.textMuted.withValues(alpha: 0.9),
+              color: theme.textMuted.withValues(alpha: 0.9),
               fontSize: 12,
             ),
           ),
@@ -423,11 +437,13 @@ class DbLensEmptyPlaceholder extends StatelessWidget {
     required this.icon,
     required this.title,
     required this.subtitle,
+    required this.theme,
   });
 
   final IconData icon;
   final String title;
   final String subtitle;
+  final DbLensTheme theme;
 
   @override
   Widget build(BuildContext context) {
@@ -441,17 +457,17 @@ class DbLensEmptyPlaceholder extends StatelessWidget {
               width: 48,
               height: 48,
               decoration: BoxDecoration(
-                color: DbLensTheme.surface,
+                color: theme.surface,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: DbLensTheme.border),
+                border: Border.all(color: theme.border),
               ),
-              child: Icon(icon, color: DbLensTheme.textMuted, size: 22),
+              child: Icon(icon, color: theme.textMuted, size: 22),
             ),
             const SizedBox(height: 16),
             Text(
               title,
-              style: const TextStyle(
-                color: DbLensTheme.textPrimary,
+              style: TextStyle(
+                color: theme.textPrimary,
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
                 letterSpacing: -0.2,
@@ -460,8 +476,8 @@ class DbLensEmptyPlaceholder extends StatelessWidget {
             const SizedBox(height: 6),
             Text(
               subtitle,
-              style: const TextStyle(
-                color: DbLensTheme.textMuted,
+              style: TextStyle(
+                color: theme.textMuted,
                 fontSize: 13,
                 height: 1.4,
               ),
@@ -474,7 +490,7 @@ class DbLensEmptyPlaceholder extends StatelessWidget {
   }
 }
 
-class DbLensSelectorField extends StatelessWidget {
+class DbLensSelectorField extends StatefulWidget {
   const DbLensSelectorField({
     super.key,
     required this.icon,
@@ -482,6 +498,10 @@ class DbLensSelectorField extends StatelessWidget {
     required this.items,
     required this.selected,
     required this.onSelected,
+    required this.theme,
+    this.searchText = '',
+    this.onSearchChanged,
+    this.searchHint = 'Search…',
   });
 
   final IconData icon;
@@ -489,6 +509,37 @@ class DbLensSelectorField extends StatelessWidget {
   final List<String> items;
   final String? selected;
   final ValueChanged<String> onSelected;
+  final DbLensTheme theme;
+  final String searchText;
+  final ValueChanged<String>? onSearchChanged;
+  final String searchHint;
+
+  @override
+  State<DbLensSelectorField> createState() => _DbLensSelectorFieldState();
+}
+
+class _DbLensSelectorFieldState extends State<DbLensSelectorField> {
+  late final TextEditingController _searchController;
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController = TextEditingController(text: widget.searchText);
+  }
+
+  @override
+  void didUpdateWidget(DbLensSelectorField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.searchText != _searchController.text) {
+      _searchController.text = widget.searchText;
+    }
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -499,12 +550,12 @@ class DbLensSelectorField extends StatelessWidget {
           padding: const EdgeInsets.only(left: 2, bottom: 6),
           child: Row(
             children: [
-              Icon(icon, size: 12, color: DbLensTheme.textMuted),
+              Icon(widget.icon, size: 12, color: widget.theme.textMuted),
               const SizedBox(width: 5),
               Text(
-                label.toUpperCase(),
-                style: const TextStyle(
-                  color: DbLensTheme.textMuted,
+                widget.label.toUpperCase(),
+                style: TextStyle(
+                  color: widget.theme.textMuted,
                   fontSize: 10,
                   fontWeight: FontWeight.w600,
                   letterSpacing: 0.8,
@@ -513,28 +564,68 @@ class DbLensSelectorField extends StatelessWidget {
             ],
           ),
         ),
+        if (widget.onSearchChanged != null) ...[
+          TextField(
+            controller: _searchController,
+            onChanged: widget.onSearchChanged,
+            decoration: widget.theme.fieldDecoration(
+              hintText: widget.searchHint,
+              prefixIcon: const Icon(Icons.search, size: 16),
+              suffixIcon: widget.searchText.isEmpty
+                  ? null
+                  : IconButton(
+                      tooltip: 'Clear',
+                      onPressed: () {
+                        _searchController.clear();
+                        widget.onSearchChanged?.call('');
+                      },
+                      icon: const Icon(Icons.close, size: 16),
+                    ),
+            ).copyWith(contentPadding: const EdgeInsets.symmetric(
+              horizontal: 10,
+              vertical: 8,
+            )),
+            style: const TextStyle(fontSize: 12),
+          ),
+          const SizedBox(height: 6),
+        ],
         DecoratedBox(
           decoration: BoxDecoration(
-            color: DbLensTheme.surface,
+            color: widget.theme.surface,
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: DbLensTheme.border),
+            border: Border.all(color: widget.theme.border),
           ),
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-            child: Row(
-              children: items.map((item) {
-                return Padding(
-                  padding: const EdgeInsets.only(right: 6),
-                  child: DbLensSelectorChip(
-                    label: item,
-                    isSelected: item == selected,
-                    onTap: () => onSelected(item),
+          child: widget.items.isEmpty
+              ? Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Text(
+                    widget.searchText.isEmpty
+                        ? 'No items'
+                        : 'No matches for "${widget.searchText}"',
+                    style: TextStyle(
+                      color: widget.theme.textMuted,
+                      fontSize: 12,
+                    ),
                   ),
-                );
-              }).toList(),
-            ),
-          ),
+                )
+              : SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+                  child: Row(
+                    children: widget.items.map((item) {
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 6),
+                        child: DbLensSelectorChip(
+                          label: item,
+                          isSelected: item == widget.selected,
+                          onTap: () => widget.onSelected(item),
+                          theme: widget.theme,
+                          highlight: widget.searchText,
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
         ),
       ],
     );
@@ -545,10 +636,12 @@ class _JumpToPageDialog extends StatefulWidget {
   const _JumpToPageDialog({
     required this.currentPage,
     required this.totalPages,
+    required this.theme,
   });
 
   final int currentPage;
   final int totalPages;
+  final DbLensTheme theme;
 
   @override
   State<_JumpToPageDialog> createState() => _JumpToPageDialogState();
@@ -588,7 +681,7 @@ class _JumpToPageDialogState extends State<_JumpToPageDialog> {
         onSubmitted: (_) => _submit(),
         decoration: InputDecoration(
           hintText: '1 – ${widget.totalPages}',
-          border: DbLensTheme.outlineBorder(),
+          border: widget.theme.outlineBorder(),
         ),
       ),
       actions: [

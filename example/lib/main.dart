@@ -94,7 +94,7 @@ class HomeScreen extends StatelessWidget {
               'Open the drawer or tap the icon\nin the app bar to inspect SQLite & prefs.',
               textAlign: TextAlign.center,
               style: TextStyle(color: Colors.black54),
-            ),
+            ),    
             const SizedBox(height: 32),
             const Divider(),
             const SizedBox(height: 16),

@@ -1,3 +1,4 @@
+import '../../core/enums/source_type.dart';
 import '../../domain/entities/collection_entity.dart';
 import '../../domain/entities/row_entity.dart';
 import '../../domain/entities/source_entity.dart';
@@ -36,4 +37,22 @@ abstract class LensRepository {
 
   /// Apakah sumber mendukung raw SQL.
   bool supportsRawSql(String sourceId);
+
+  /// Perbarui nilai satu sel.
+  Future<void> updateCell(
+    String sourceId,
+    String collection,
+    String column,
+    Object? newValue,
+    Map<String, dynamic> row,
+  );
+
+  /// Ambil semua baris untuk ekspor.
+  Future<List<Map<String, dynamic>>> getAllRows(
+    String sourceId,
+    String collection,
+  );
+
+  /// Jenis sumber data.
+  SourceType? getSourceType(String sourceId);
 }

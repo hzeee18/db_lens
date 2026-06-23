@@ -1,6 +1,6 @@
 name: db_lens
 description: A Flutter debug tool for inspecting sqflite SQLite databases directly on device. Built for QA and developers — no external tools or adb needed.
-version: 0.0.1
+version: 0.0.2
 repository: https://github.com/hzeee18/db_lens
 homepage: https://github.com/hzeee18/db_lens
 

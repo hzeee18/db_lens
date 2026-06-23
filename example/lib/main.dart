@@ -1,58 +1,28 @@
 import 'package:flutter/material.dart';
-import 'package:path/path.dart';
-import 'package:sqflite/sqflite.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:db_lens/db_lens.dart';
+
+import 'seed/shared_preferences_seeder.dart';
+import 'seed/sqlite_seeder.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await _initDatabase();
+  await Future.wait([
+    _initDatabase(),
+    _initSharedPreferences(),
+  ]);
   runApp(const MyApp());
 }
 
 Future<void> _initDatabase() async {
-  final db = await openDatabase(
-    join(await getDatabasesPath(), 'example.db'),
-    version: 1,
-    onCreate: (db, version) async {
-      await db.execute('''
-        CREATE TABLE users (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          name TEXT NOT NULL,
-          email TEXT NOT NULL,
-          age INTEGER
-        )
-      ''');
-      await db.execute('''
-        CREATE TABLE products (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          name TEXT NOT NULL,
-          price REAL NOT NULL,
-          stock INTEGER DEFAULT 0
-        )
-      ''');
-
-      // Seed some dummy data
-      final batch = db.batch();
-      for (var i = 1; i <= 20; i++) {
-        batch.insert('users', {
-          'name': 'User $i',
-          'email': 'user$i@example.com',
-          'age': 20 + i,
-        });
-      }
-      for (var i = 1; i <= 10; i++) {
-        batch.insert('products', {
-          'name': 'Product $i',
-          'price': i * 9.99,
-          'stock': i * 5,
-        });
-      }
-      await batch.commit();
-    },
-  );
-
-  // Register the database with DbLens
+  final db = await SqliteSeeder.open();
   DbLens.register('Example DB', db);
+}
+
+Future<void> _initSharedPreferences() async {
+  final prefs = await SharedPreferences.getInstance();
+  await SharedPreferencesSeeder.seed(prefs);
+  DbLens.registerSharedPreferences('App Prefs', prefs);
 }
 
 class MyApp extends StatelessWidget {
@@ -81,7 +51,6 @@ class HomeScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Text('DbLens Example'),
         actions: [
-          // Option 2: open manually from anywhere
           IconButton(
             icon: const Icon(Icons.storage),
             tooltip: 'Open DB Lens',
@@ -102,9 +71,8 @@ class HomeScreen extends StatelessWidget {
             ),
             ListTile(
               leading: const Icon(Icons.storage),
-              title: const Text('Inspect Database'),
-              subtitle: const Text('View SQLite tables & data'),
-              // Option 1: use DbLensButton
+              title: const Text('Inspect Data Sources'),
+              subtitle: const Text('SQLite tables & SharedPreferences'),
               trailing: const DbLensButton(),
               onTap: () {},
             ),
@@ -123,7 +91,7 @@ class HomeScreen extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             const Text(
-              'Open the drawer or tap the icon\nin the app bar to inspect the database.',
+              'Open the drawer or tap the icon\nin the app bar to inspect SQLite & prefs.',
               textAlign: TextAlign.center,
               style: TextStyle(color: Colors.black54),
             ),
@@ -135,10 +103,8 @@ class HomeScreen extends StatelessWidget {
               style: TextStyle(color: Colors.black54, fontSize: 13),
             ),
             const SizedBox(height: 12),
-            // Option 1: drop DbLensButton anywhere
             const DbLensButton(),
             const SizedBox(height: 8),
-            // Custom style
             DbLensButton(
               label: 'Custom Label',
               icon: Icons.bug_report,

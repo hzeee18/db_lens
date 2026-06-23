@@ -1,0 +1,66 @@
+import 'package:shared_preferences/shared_preferences.dart';
+
+/// Seeder data demo untuk SharedPreferences di example app.
+abstract final class SharedPreferencesSeeder {
+  static const seedVersionKey = '_db_lens_seed_version';
+  static const currentSeedVersion = 1;
+
+  /// Menulis data sample ke [prefs].
+  ///
+  /// Lewati jika [force] false dan seed version sudah cocok.
+  static Future<void> seed(
+    SharedPreferences prefs, {
+    bool force = false,
+  }) async {
+    final existing = prefs.getInt(seedVersionKey);
+    if (!force && existing == currentSeedVersion) return;
+
+    await prefs.setString('app_theme', 'dark');
+    await prefs.setString('app_locale', 'id_ID');
+    await prefs.setString('user_display_name', 'Demo User');
+
+    await prefs.setBool('onboarding_done', true);
+    await prefs.setBool('notifications_enabled', false);
+    await prefs.setBool('biometric_login', true);
+
+    await prefs.setInt('login_count', 42);
+    await prefs.setInt('session_timeout_minutes', 30);
+
+    await prefs.setDouble('last_rating', 4.5);
+    await prefs.setDouble('cart_total', 129.99);
+
+    await prefs.setStringList(
+      'recent_searches',
+      ['users', 'products', 'settings', 'orders'],
+    );
+    await prefs.setStringList(
+      'favorite_categories',
+      ['electronics', 'books', 'food'],
+    );
+
+    await prefs.setInt(seedVersionKey, currentSeedVersion);
+  }
+
+  /// Hapus semua key demo (kecuali seed version) — berguna saat testing ulang.
+  static Future<void> clearDemoData(SharedPreferences prefs) async {
+    const demoKeys = [
+      'app_theme',
+      'app_locale',
+      'user_display_name',
+      'onboarding_done',
+      'notifications_enabled',
+      'biometric_login',
+      'login_count',
+      'session_timeout_minutes',
+      'last_rating',
+      'cart_total',
+      'recent_searches',
+      'favorite_categories',
+    ];
+
+    for (final key in demoKeys) {
+      await prefs.remove(key);
+    }
+    await prefs.remove(seedVersionKey);
+  }
+}

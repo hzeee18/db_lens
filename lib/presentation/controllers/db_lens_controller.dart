@@ -84,7 +84,7 @@ class DbLensController extends ChangeNotifier {
   bool queryMode = false;
   bool queryExpanded = false;
   bool queryCustomResult = false;
-  bool exporting = false;
+  bool copyingJson = false;
 
   String searchText = '';
   String sourceSearchText = '';
@@ -124,7 +124,7 @@ class DbLensController extends ChangeNotifier {
           : null;
 
   bool get canCopyJson =>
-      !exporting &&
+      !copyingJson &&
       !loading &&
       (queryMode
           ? activeRows.isNotEmpty || activeRowCount > 0
@@ -140,8 +140,6 @@ class DbLensController extends ChangeNotifier {
     return cols.where((c) => c != '_rowid_').toList();
   }
 
-  List<String> get displayColumns => activeColumns;
-
   int get activeRowCount => pagination?.totalRows ?? 0;
 
   bool get hasActiveSearch => searchText.trim().isNotEmpty;
@@ -150,7 +148,7 @@ class DbLensController extends ChangeNotifier {
       selectedSourceId != null && _repository.supportsRawSql(selectedSourceId!);
 
   bool get canRefresh {
-    if (loading || runningQuery || exporting) return false;
+    if (loading || runningQuery || copyingJson) return false;
     if (queryMode) return queryText.trim().isNotEmpty;
     if (selectedCollection == null) return false;
     return !(pagination?.isLoading ?? false);
@@ -484,10 +482,7 @@ class DbLensController extends ChangeNotifier {
     return a == b;
   }
 
-  // ── Export & JSON view ────────────────────────────────────────────────────
-
-  /// Ambil semua baris aktif tanpa pagination (untuk JSON view & export).
-  Future<List<Map<String, Object?>>> allRows() => _fetchAllActiveRows();
+  // ── Copy JSON ─────────────────────────────────────────────────────────────
 
   Future<List<Map<String, Object?>>> _fetchAllActiveRows() async {
     final sourceId = selectedSourceId;
@@ -511,18 +506,18 @@ class DbLensController extends ChangeNotifier {
 
   Future<String?> copyAllAsJson() async {
     if (!canCopyJson) return null;
-    exporting = true;
+    copyingJson = true;
     notifyListeners();
     try {
       final rows = await _fetchAllActiveRows();
       final exportRows = rows
           .map((row) => Map<String, Object?>.from(row)..remove('_rowid_'))
           .toList();
-      exporting = false;
+      copyingJson = false;
       notifyListeners();
       return jsonEncode(exportRows);
     } catch (error) {
-      exporting = false;
+      copyingJson = false;
       lastError = 'Failed to copy JSON: $error';
       notifyListeners();
       return null;

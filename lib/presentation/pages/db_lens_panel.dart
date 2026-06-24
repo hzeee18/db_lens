@@ -137,16 +137,6 @@ class _DbLensPanelState extends State<DbLensPanel> {
     setState(() => _isJsonView = !_isJsonView);
   }
 
-  String _jsonArrayText(List<Map<String, Object?>> rows) {
-    return JsonViewUtils.encodePrettyArray(rows);
-  }
-
-  Future<void> _copyJsonArray(List<Map<String, Object?>> rows) async {
-    final text = _jsonArrayText(rows);
-    await Clipboard.setData(ClipboardData(text: text));
-    _showSnackBar('Copied JSON array');
-  }
-
   Future<void> _copyAllAsJson() async {
     final json = await _controller.copyAllAsJson();
     if (!mounted || json == null) return;
@@ -560,7 +550,7 @@ class _DbLensPanelState extends State<DbLensPanel> {
   }
 
   List<Widget> _buildDataSlivers(DbLensController c) {
-    final columns = c.displayColumns;
+    final columns = c.activeColumns;
     final visibleRows = c.visibleRows(columns: columns);
 
     if (c.loading) {
@@ -636,7 +626,7 @@ class _DbLensPanelState extends State<DbLensPanel> {
       if (c.queryMode && c.queryCustomResult)
         SliverToBoxAdapter(child: _buildCustomQueryBanner(c)),
       SliverToBoxAdapter(
-        child: _buildTableToolbar(c, visibleRows.length, visibleRows),
+        child: _buildTableToolbar(c, visibleRows.length),
       ),
       SliverToBoxAdapter(
         child: ColoredBox(
@@ -658,7 +648,7 @@ class _DbLensPanelState extends State<DbLensPanel> {
                 Positioned.fill(
                   child: DbLensTablePageSkeleton(theme: _theme),
                 ),
-              if (c.exporting)
+              if (c.copyingJson)
                 Positioned.fill(
                   child: ColoredBox(
                     color: _theme.bg.withValues(alpha: 0.7),
@@ -678,7 +668,7 @@ class _DbLensPanelState extends State<DbLensPanel> {
       key: const ValueKey('json-view'),
       padding: const EdgeInsets.all(16),
       child: SelectableText(
-        _jsonArrayText(rows),
+        JsonViewUtils.encodePrettyArray(rows),
         style: TextStyle(
           fontSize: DbLensTheme.dataFontSize,
           height: 1.5,
@@ -711,7 +701,6 @@ class _DbLensPanelState extends State<DbLensPanel> {
   Widget _buildTableToolbar(
     DbLensController c,
     int visibleCount,
-    List<Map<String, Object?>> visibleRows,
   ) {
     final pagination = c.pagination;
     final statusText = c.queryMode
@@ -721,7 +710,7 @@ class _DbLensPanelState extends State<DbLensPanel> {
             : '0 rows';
 
     final hintText = _isJsonView
-        ? 'Select text to copy · copy button copies current page'
+        ? 'Current page as JSON · copy button copies all rows'
         : c.canEditCells
             ? 'Tap row to view JSON · long-press cell to edit'
             : 'Tap row to view JSON · long-press index to copy';
@@ -763,18 +752,11 @@ class _DbLensPanelState extends State<DbLensPanel> {
               color: _theme.accent,
             ),
           ),
-          if (_isJsonView)
-            IconButton(
-              tooltip: 'Copy JSON array',
-              onPressed: () => _copyJsonArray(visibleRows),
-              visualDensity: VisualDensity.compact,
-              icon: Icon(Icons.content_copy, size: 18, color: _theme.accent),
-            ),
           IconButton(
             tooltip: 'Copy all as JSON',
-            onPressed: c.canCopyJson && !c.exporting ? _copyAllAsJson : null,
+            onPressed: c.canCopyJson && !c.copyingJson ? _copyAllAsJson : null,
             visualDensity: VisualDensity.compact,
-            icon: c.exporting
+            icon: c.copyingJson
                 ? SizedBox(
                     width: 14,
                     height: 14,

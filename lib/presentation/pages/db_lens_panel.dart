@@ -333,7 +333,6 @@ class _DbLensPanelState extends State<DbLensPanel> {
           color: _theme.textSecondary,
           fontSize: 11,
           fontWeight: FontWeight.w500,
-          fontFamily: 'monospace',
           letterSpacing: -0.2,
         ),
       ),
@@ -600,7 +599,9 @@ class _DbLensPanelState extends State<DbLensPanel> {
           child: ColoredBox(
             color: _theme.bg,
             child: DbLensEmptyPlaceholder(
-              icon: c.queryMode ? Icons.search_off_outlined : Icons.inbox_outlined,
+              icon: c.queryMode
+                  ? Icons.search_off_outlined
+                  : Icons.inbox_outlined,
               title: c.queryMode
                   ? (c.queryInfoMessage ?? 'No rows returned')
                   : 'Collection is empty',
@@ -679,7 +680,6 @@ class _DbLensPanelState extends State<DbLensPanel> {
       child: SelectableText(
         _jsonArrayText(rows),
         style: TextStyle(
-          fontFamily: 'monospace',
           fontSize: DbLensTheme.dataFontSize,
           height: 1.5,
           color: _theme.textPrimary,
@@ -747,7 +747,6 @@ class _DbLensPanelState extends State<DbLensPanel> {
             style: TextStyle(
               color: _theme.textSecondary,
               fontSize: 11,
-              fontFamily: 'monospace',
             ),
           ),
           const SizedBox(width: 4),
@@ -871,7 +870,6 @@ class _DbLensPanelState extends State<DbLensPanel> {
             color: _theme.textMuted.withValues(alpha: 0.9),
             fontSize: DbLensTheme.headerFontSize,
             fontWeight: FontWeight.w600,
-            fontFamily: 'monospace',
             letterSpacing: 0.3,
           ),
         ),
@@ -899,7 +897,6 @@ class _DbLensPanelState extends State<DbLensPanel> {
               color: isActive ? _theme.textPrimary : _theme.textSecondary,
               fontSize: DbLensTheme.headerFontSize,
               fontWeight: FontWeight.w600,
-              fontFamily: 'monospace',
               letterSpacing: 0.2,
             ),
           ),
@@ -938,7 +935,6 @@ class _DbLensPanelState extends State<DbLensPanel> {
             style: TextStyle(
               color: _theme.textMuted.withValues(alpha: 0.85),
               fontSize: DbLensTheme.dataFontSize - 1,
-              fontFamily: 'monospace',
             ),
           ),
         ),
@@ -977,7 +973,6 @@ class _DbLensPanelState extends State<DbLensPanel> {
             style: TextStyle(
               color: RowUtils.valueColor(value, _theme),
               fontSize: DbLensTheme.dataFontSize,
-              fontFamily: 'monospace',
               fontStyle: isNull ? FontStyle.italic : FontStyle.normal,
               height: 1.35,
             ),

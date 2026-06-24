@@ -35,23 +35,22 @@ class DbLensThemeData {
   final Color syntaxBool;
   final Color syntaxDefault;
 
-  /// Turunkan warna dari [ThemeData] MaterialApp yang sudah ada.
   factory DbLensThemeData.fromMaterialTheme(ThemeData theme) {
     final cs = theme.colorScheme;
     return DbLensThemeData(
-      bg: theme.scaffoldBackgroundColor,
-      surface: cs.surfaceContainerHighest,
-      border: cs.outlineVariant,
-      textPrimary: cs.onSurface,
-      textSecondary: cs.onSurfaceVariant,
-      textMuted: cs.outline,
+      bg: const Color(0xFFFFFBF8),
+      surface: const Color(0xFFF5F0EB),
+      border: const Color(0xFFE8E0D8),
+      textPrimary: const Color(0xFF1C1917),
+      textSecondary: const Color(0xFF78716C),
+      textMuted: const Color(0xFFA8A29E),
       accent: cs.primary,
-      accentSoft: cs.primaryContainer,
-      syntaxNull: const Color(0xFF9CA3AF),
-      syntaxString: const Color(0xFF16A34A),
-      syntaxNumber: const Color(0xFFD97706),
-      syntaxBool: cs.tertiary,
-      syntaxDefault: cs.onSurface,
+      accentSoft: cs.primary.withValues(alpha: 0.1),
+      syntaxNull: const Color(0xFFA8A29E),
+      syntaxString: const Color(0xFF15803D),
+      syntaxNumber: const Color(0xFFB45309),
+      syntaxBool: const Color(0xFF1D4ED8),
+      syntaxDefault: const Color(0xFF1C1917),
     );
   }
 

@@ -187,7 +187,7 @@ class _DbLensPanelState extends State<DbLensPanel> {
         minChildSize: DbLensTheme.minChildSize,
         maxChildSize: DbLensTheme.maxChildSize,
         builder: (context, scrollController) {
-          final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+          // final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
           return AnimatedBuilder(
             animation: _sheetController,
             builder: (context, _) {
@@ -199,8 +199,8 @@ class _DbLensPanelState extends State<DbLensPanel> {
                     FocusManager.instance.primaryFocus?.unfocus(),
                 child: DecoratedBox(
                   decoration: _theme.sheetDecoration(size: sheetSize),
-                  child: Padding(
-                    padding: EdgeInsets.only(bottom: bottomInset),
+                  child: Container(
+                    // padding: EdgeInsets.only(bottom: bottomInset),
                     child: CustomScrollView(
                       controller: scrollController,
                       keyboardDismissBehavior:
@@ -752,21 +752,21 @@ class _DbLensPanelState extends State<DbLensPanel> {
               color: _theme.accent,
             ),
           ),
-          IconButton(
-            tooltip: 'Copy all as JSON',
-            onPressed: c.canCopyJson && !c.copyingJson ? _copyAllAsJson : null,
-            visualDensity: VisualDensity.compact,
-            icon: c.copyingJson
-                ? SizedBox(
-                    width: 14,
-                    height: 14,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: _theme.accent,
-                    ),
-                  )
-                : Icon(Icons.content_copy, size: 18, color: _theme.accent),
-          ),
+          // IconButton(
+          //   tooltip: 'Copy all as JSON',
+          //   onPressed: c.canCopyJson && !c.copyingJson ? _copyAllAsJson : null,
+          //   visualDensity: VisualDensity.compact,
+          //   icon: c.copyingJson
+          //       ? SizedBox(
+          //           width: 14,
+          //           height: 14,
+          //           child: CircularProgressIndicator(
+          //             strokeWidth: 2,
+          //             color: _theme.accent,
+          //           ),
+          //         )
+          //       : Icon(Icons.content_copy, size: 18, color: _theme.accent),
+          // ),
           IconButton(
             tooltip: 'Refresh',
             onPressed: c.canRefresh ? _controller.refresh : null,

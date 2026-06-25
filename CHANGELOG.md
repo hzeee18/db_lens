@@ -1,3 +1,10 @@
+## 0.0.5
+
+* Remove Excel export and drop `excel` / `share_plus` dependencies
+* Replace export menu with a dedicated copy-all-JSON toolbar button
+* `DbLensThemeData.fromMaterialTheme()` uses a fixed warm palette (accent still follows app primary)
+* Panel typography uses the default font instead of monospace
+
 ## 0.0.4
 
 * Dynamic theme support via `DbLensThemeData` and `DbLensThemeData.fromMaterialTheme()`

@@ -18,7 +18,7 @@ A Flutter debug tool for inspecting SQLite and SharedPreferences directly on dev
 
 ```yaml
 dev_dependencies:
-  db_lens: ^0.0.4
+  db_lens: ^0.0.5
 ```
 
 ---
@@ -62,7 +62,7 @@ DbLensButton(
 
 ## Dynamic Theme
 
-Match the panel to your app's `MaterialApp` theme, or pass custom colors.
+Align panel accent with your app's primary color via `fromMaterialTheme()`, or pass custom colors.
 
 ```dart
 DbLens.open(
@@ -127,7 +127,7 @@ DbLens.open(
 
 ## Example App
 
-Run the included example to try every feature (SQLite + SharedPreferences, themed open, export, edit, JSON view):
+Run the included example to try every feature (SQLite + SharedPreferences, themed open, edit, JSON view):
 
 ```bash
 cd example

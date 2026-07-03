@@ -3,29 +3,63 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  testWidgets('openCustom disposes controller on pop', (tester) async {
-    DbLensController? capturedController;
+  testWidgets('DbLensControllerScope.of throws without an ancestor scope', (tester) async {
     await tester.pumpWidget(
       MaterialApp(
         home: Builder(
-          builder: (context) => ElevatedButton(
-            onPressed: () => DbLens.openCustom(
-              context,
-              builder: (ctx, controller) {
-                capturedController = controller;
-                return const SizedBox();
-              },
-            ),
-            child: const Text('open'),
+          builder: (context) {
+            expect(() => DbLensControllerScope.of(context), throwsAssertionError);
+            return const SizedBox();
+          },
+        ),
+      ),
+    );
+  });
+
+  testWidgets('DbLensControllerScope provides an initialized controller to descendants',
+      (tester) async {
+    DbLensController? captured;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: DbLensControllerScope(
+          child: Builder(
+            builder: (context) {
+              captured = DbLensControllerScope.of(context);
+              return const SizedBox();
+            },
           ),
         ),
       ),
     );
-    await tester.tap(find.text('open'));
     await tester.pumpAndSettle();
-    expect(capturedController, isNotNull);
 
-    Navigator.of(tester.element(find.byType(SizedBox))).pop();
+    expect(captured, isNotNull);
+    expect(captured!.isInitialized, isTrue);
+  });
+
+  testWidgets('DbLensControllerScope disposes an owned controller when unmounted',
+      (tester) async {
+    DbLensController? captured;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: DbLensControllerScope(
+          child: Builder(
+            builder: (context) {
+              captured = DbLensControllerScope.of(context);
+              return const SizedBox();
+            },
+          ),
+        ),
+      ),
+    );
     await tester.pumpAndSettle();
+    expect(captured, isNotNull);
+
+    await tester.pumpWidget(const MaterialApp(home: SizedBox()));
+    await tester.pumpAndSettle();
+
+    expect(() => captured!.addListener(() {}), throwsFlutterError);
   });
 }

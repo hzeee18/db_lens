@@ -3,12 +3,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  testWidgets('DbLens.openPage pushes a route', (tester) async {
+  testWidgets('DbLens.open with fullPage presentationMode pushes a route', (tester) async {
     await tester.pumpWidget(
       MaterialApp(
         home: Builder(
           builder: (context) => ElevatedButton(
-            onPressed: () => DbLens.openPage(context),
+            onPressed: () => DbLens.open(
+              context,
+              config: const DbLensConfig(
+                presentationMode: DbLensPresentationMode.fullPage,
+              ),
+            ),
             child: const Text('open'),
           ),
         ),

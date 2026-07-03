@@ -1,11 +1,17 @@
 import 'package:db_lens/db_lens.dart';
 import 'package:flutter/material.dart';
+import 'package:sqflite/sqflite.dart';
 
 /// Demo Change History: [DbLens.configureHistory], [DbLens.createHistoryController],
 /// dan [DbLensHistorySheet.show]. Tracking berjalan lewat polling — tombol
 /// di sini memicu insert/update/delete manual supaya perubahan terdeteksi.
 class HistoryDemoScreen extends StatefulWidget {
-  const HistoryDemoScreen({super.key});
+  const HistoryDemoScreen({super.key, required this.database});
+
+  /// Database yang sama dengan yang dipakai `DbLens.register('Example DB', db)`
+  /// di main.dart — diteruskan langsung dari app, bukan diambil balik lewat
+  /// db_lens (registry bukan bagian dari public API).
+  final Database database;
 
   @override
   State<HistoryDemoScreen> createState() => _HistoryDemoScreenState();
@@ -18,10 +24,8 @@ class _HistoryDemoScreenState extends State<HistoryDemoScreen> {
   String? _lastAction;
 
   Future<void> _insertUser() async {
-    final db = DbLens.getDatabase(_sourceId);
-    if (db == null) return;
     final now = DateTime.now();
-    final id = await db.insert('users', {
+    final id = await widget.database.insert('users', {
       'name': 'New User ${now.millisecondsSinceEpoch}',
       'email': 'new${now.millisecondsSinceEpoch}@example.com',
       'age': 25,
@@ -32,19 +36,15 @@ class _HistoryDemoScreenState extends State<HistoryDemoScreen> {
   }
 
   Future<void> _updateUser() async {
-    final db = DbLens.getDatabase(_sourceId);
-    if (db == null) return;
-    await db.update('users', {'age': 99}, where: 'id = ?', whereArgs: [1]);
+    await widget.database.update('users', {'age': 99}, where: 'id = ?', whereArgs: [1]);
     setState(() => _lastAction = 'Updated user #1 (age -> 99)');
   }
 
   Future<void> _deleteUser() async {
-    final db = DbLens.getDatabase(_sourceId);
-    if (db == null) return;
-    final rows = await db.query('users', orderBy: 'id DESC', limit: 1);
+    final rows = await widget.database.query('users', orderBy: 'id DESC', limit: 1);
     if (rows.isEmpty) return;
     final id = rows.first['id'];
-    await db.delete('users', where: 'id = ?', whereArgs: [id]);
+    await widget.database.delete('users', where: 'id = ?', whereArgs: [id]);
     setState(() => _lastAction = 'Deleted user #$id');
   }
 
@@ -56,12 +56,15 @@ class _HistoryDemoScreenState extends State<HistoryDemoScreen> {
   Future<void> _openHistory() async {
     final historyController = DbLens.createHistoryController();
     await historyController.loadFor(_sourceId);
-    if (!mounted) return;
+    if (!mounted) {
+      historyController.dispose();
+      return;
+    }
     await DbLensHistorySheet.show(
       context,
       controller: historyController,
-      theme: DbLensTheme(DbLensThemeData.fromMaterialTheme(Theme.of(context))),
       sourceName: _sourceId,
+      theme: DbLensTheme(DbLensThemeData.fromMaterialTheme(Theme.of(context))),
     );
     historyController.dispose();
   }
@@ -86,18 +89,9 @@ class _HistoryDemoScreenState extends State<HistoryDemoScreen> {
               spacing: 8,
               runSpacing: 8,
               children: [
-                ElevatedButton(
-                  onPressed: _insertUser,
-                  child: const Text('Insert user'),
-                ),
-                ElevatedButton(
-                  onPressed: _updateUser,
-                  child: const Text('Update user #1'),
-                ),
-                ElevatedButton(
-                  onPressed: _deleteUser,
-                  child: const Text('Delete last user'),
-                ),
+                ElevatedButton(onPressed: _insertUser, child: const Text('Insert user')),
+                ElevatedButton(onPressed: _updateUser, child: const Text('Update user #1')),
+                ElevatedButton(onPressed: _deleteUser, child: const Text('Delete last user')),
               ],
             ),
             const SizedBox(height: 16),

@@ -10,12 +10,6 @@ void main() {
     databaseFactory = databaseFactoryFfi;
   });
 
-  tearDown(() {
-    for (final name in List.of(DbLens.databaseNames)) {
-      DbLens.unregister(name);
-    }
-  });
-
   test('createController().initialize() loads sources from registry', () async {
     final db = await openDatabase(
       inMemoryDatabasePath,
@@ -25,10 +19,11 @@ void main() {
       },
     );
     DbLens.register('Test DB', db);
+    addTearDown(() => DbLens.unregisterSource('Test DB'));
 
     final controller = DbLens.createController();
     await controller.initialize();
-    expect(controller.sources, isNotEmpty);
+    expect(controller.source.sources, isNotEmpty);
 
     controller.dispose();
     await db.close();

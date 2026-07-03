@@ -11,12 +11,6 @@ void main() {
     databaseFactory = databaseFactoryFfi;
   });
 
-  tearDown(() {
-    for (final name in List.of(DbLens.databaseNames)) {
-      DbLens.unregister(name);
-    }
-  });
-
   test('loadBrowseSnapshot lists all sources, collections, and row counts',
       () async {
     final db = await openDatabase(
@@ -35,10 +29,12 @@ void main() {
       },
     );
     DbLens.register('App DB', db);
+    addTearDown(() => DbLens.unregisterSource('App DB'));
 
     SharedPreferences.setMockInitialValues({'theme': 'dark'});
     final prefs = await SharedPreferences.getInstance();
     DbLens.registerSharedPreferences('Settings', prefs);
+    addTearDown(() => DbLens.unregisterSource('Settings'));
 
     final controller = DbLens.createController();
     final snapshot = await controller.loadBrowseSnapshot();
@@ -79,25 +75,26 @@ void main() {
       },
     );
     DbLens.register('Primary', db);
+    addTearDown(() => DbLens.unregisterSource('Primary'));
 
     final controller = DbLens.createController();
     await controller.loadBrowseSnapshot();
 
-    controller.setBrowseSearchText('beta');
-    expect(controller.filteredBrowseSnapshot, hasLength(1));
+    controller.browse.setSearchText('beta');
+    expect(controller.browse.filteredSnapshot, hasLength(1));
     expect(
-      controller.filteredBrowseSnapshot.first.collections,
+      controller.browse.filteredSnapshot.first.collections,
       hasLength(1),
     );
     expect(
-      controller.filteredBrowseSnapshot.first.collections.first.name,
+      controller.browse.filteredSnapshot.first.collections.first.name,
       'beta',
     );
 
-    controller.setBrowseSearchText('primary');
-    expect(controller.filteredBrowseSnapshot, hasLength(1));
+    controller.browse.setSearchText('primary');
+    expect(controller.browse.filteredSnapshot, hasLength(1));
     expect(
-      controller.filteredBrowseSnapshot.first.collections,
+      controller.browse.filteredSnapshot.first.collections,
       hasLength(2),
     );
 
@@ -116,11 +113,12 @@ void main() {
       },
     );
     DbLens.register('Counter DB', db);
+    addTearDown(() => DbLens.unregisterSource('Counter DB'));
 
     final controller = DbLens.createController();
     await controller.loadBrowseSnapshot();
     expect(
-      controller.browseSnapshot.first.collections.first.rowCount,
+      controller.browse.snapshot.first.collections.first.rowCount,
       0,
     );
 
@@ -128,7 +126,7 @@ void main() {
     await controller.refreshBrowse();
 
     expect(
-      controller.browseSnapshot.first.collections.first.rowCount,
+      controller.browse.snapshot.first.collections.first.rowCount,
       1,
     );
 

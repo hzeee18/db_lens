@@ -11,12 +11,6 @@ void main() {
     databaseFactory = databaseFactoryFfi;
   });
 
-  tearDown(() {
-    for (final name in List.of(DbLens.databaseNames)) {
-      DbLens.unregister(name);
-    }
-  });
-
   testWidgets(
     'DbLensPanel asserts when given an external controller that was not initialized',
     (tester) async {
@@ -36,29 +30,37 @@ void main() {
   testWidgets(
     'DbLensPanel mounts fine when the external controller was initialized first',
     (tester) async {
-      final db = await openDatabase(
-        inMemoryDatabasePath,
-        version: 1,
-        onCreate: (db, version) async {
-          await db.execute('CREATE TABLE t (id INTEGER PRIMARY KEY)');
-        },
-      );
-      DbLens.register('Test DB', db);
+      late Database db;
+      late DbLensController controller;
+      // Real sqflite I/O harus lewat runAsync — testWidgets menahan
+      // penyelesaian isolate/port asli sqflite_common_ffi kalau dipanggil
+      // langsung tanpa runAsync, menyebabkan await ini hang selamanya.
+      await tester.runAsync(() async {
+        db = await openDatabase(  
+          inMemoryDatabasePath,
+          version: 1,
+          onCreate: (db, version) async {
+            await db.execute('CREATE TABLE t (id INTEGER PRIMARY KEY)');
+          },
+        );
+        DbLens.register('Test DB', db);
 
-      final controller = DbLens.createController();
-      await controller.initialize();
+        controller = DbLens.createController();
+        await controller.initialize();
+      });
+      addTearDown(() => DbLens.unregisterSource('Test DB'));
       addTearDown(controller.dispose);
 
       await tester.pumpWidget(
         MaterialApp(
-          home: DbLens.buildPanel(controller: controller),
+          home: Scaffold(body: DbLens.buildPanel(controller: controller)),
         ),
       );
 
       expect(tester.takeException(), isNull);
       expect(find.byType(DbLensPanel), findsOneWidget);
 
-      await db.close();
+      await tester.runAsync(() => db.close());
     },
   );
 }

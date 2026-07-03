@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:sqflite/sqflite.dart';
 import 'package:db_lens/db_lens.dart';
 
 import 'screens/custom_ui_screen.dart';
@@ -11,16 +12,15 @@ import 'seed/sqlite_seeder.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Future.wait([
-    _initDatabase(),
-    _initSharedPreferences(),
-  ]);
-  runApp(const MyApp());
+  final db = await _initDatabase();
+  await _initSharedPreferences();
+  runApp(MyApp(database: db));
 }
 
-Future<void> _initDatabase() async {
+Future<Database> _initDatabase() async {
   final db = await SqliteSeeder.open();
   DbLens.register('Example DB', db);
+  return db;
 }
 
 Future<void> _initSharedPreferences() async {
@@ -30,7 +30,9 @@ Future<void> _initSharedPreferences() async {
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  const MyApp({super.key, required this.database});
+
+  final Database database;
 
   @override
   Widget build(BuildContext context) {
@@ -38,7 +40,7 @@ class MyApp extends StatelessWidget {
       title: 'DbLens Example',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(colorSchemeSeed: Colors.deepPurple, useMaterial3: true),
-      home: const HomeScreen(),
+      home: HomeScreen(database: database),
     );
   }
 }
@@ -60,24 +62,32 @@ class _DemoItem {
 }
 
 class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key});
+  const HomeScreen({super.key, required this.database});
+
+  final Database database;
 
   List<_DemoItem> _demos() => [
         _DemoItem(
           title: 'Bottom Sheet (default)',
-          subtitle: 'DbLens.open(context) — perilaku default sejak v0.0.1',
+          subtitle: 'DbLens.open(context) — default presentation mode',
           icon: Icons.vertical_align_bottom,
           onTap: (context) => DbLens.open(context),
         ),
         _DemoItem(
           title: 'Full Page',
-          subtitle: 'DbLens.openPage(context) — Navigator.push full-screen',
+          subtitle:
+              'DbLens.open(context, config: DbLensConfig(presentationMode: fullPage))',
           icon: Icons.fullscreen,
-          onTap: (context) => DbLens.openPage(context),
+          onTap: (context) => DbLens.open(
+            context,
+            config: const DbLensConfig(
+              presentationMode: DbLensPresentationMode.fullPage,
+            ),
+          ),
         ),
         _DemoItem(
-          title: 'Presentation Mode shorthand',
-          subtitle: 'DbLensConfig.presentationMode & mode: override',
+          title: 'Presentation Mode',
+          subtitle: 'DbLensConfig.presentationMode',
           icon: Icons.tune,
           builder: (context) => const PresentationModesScreen(),
         ),
@@ -88,27 +98,18 @@ class HomeScreen extends StatelessWidget {
           builder: (context) => const EmbeddedPanelScreen(),
         ),
         _DemoItem(
-          title: 'Custom UI (openCustom)',
-          subtitle: 'DbLens.openCustom() — builder hook via Navigator.push',
+          title: 'Custom UI (DbLensControllerScope)',
+          subtitle:
+              'Compose widget sendiri: DbLensControllerScope + DbLensLayout + widget publik',
           icon: Icons.widgets_outlined,
-          onTap: (context) => DbLens.openCustom(
-            context,
-            builder: (context, controller) =>
-                _MinimalCustomBrowser(controller: controller),
-          ),
-        ),
-        _DemoItem(
-          title: 'Custom UI (DbLensInspectorScope)',
-          subtitle: 'Controller headless di-embed langsung di widget tree',
-          icon: Icons.extension_outlined,
           builder: (context) => const CustomUiScreen(),
         ),
         _DemoItem(
           title: 'Change History',
           subtitle:
-              'configureHistory · createHistoryController · DbLensHistorySheet',
+              'configureHistory · createHistoryController · DbLensHistoryPanel',
           icon: Icons.history,
-          builder: (context) => const HistoryDemoScreen(),
+          builder: (context) => HistoryDemoScreen(database: database),
         ),
       ];
 
@@ -153,7 +154,7 @@ class HomeScreen extends StatelessWidget {
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 12),
             child: Text(
-              'v0.0.6 — Custom UI & Headless API',
+              'Database Inspector Framework',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
           ),
@@ -192,70 +193,6 @@ class HomeScreen extends StatelessWidget {
               foregroundColor: Colors.white,
             ),
           ),
-        ],
-      ),
-    );
-  }
-}
-
-class _MinimalCustomBrowser extends StatefulWidget {
-  const _MinimalCustomBrowser({required this.controller});
-
-  final DbLensController controller;
-
-  @override
-  State<_MinimalCustomBrowser> createState() => _MinimalCustomBrowserState();
-}
-
-class _MinimalCustomBrowserState extends State<_MinimalCustomBrowser> {
-  @override
-  void initState() {
-    super.initState();
-    widget.controller.loadBrowseSnapshot();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final controller = widget.controller;
-
-    if (controller.browseLoading && !controller.hasBrowseSnapshot) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
-    }
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Minimal Custom Browser'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed:
-                controller.browseRefreshing ? null : controller.refreshBrowse,
-          ),
-        ],
-      ),
-      body: ListView(
-        padding: const EdgeInsets.all(12),
-        children: [
-          for (final source in controller.filteredBrowseSnapshot) ...[
-            ListTile(
-              leading: const Icon(Icons.dns_outlined),
-              title: Text(source.sourceName),
-              subtitle: Text('${source.totalRowCount} rows total'),
-            ),
-            for (final collection in source.collections)
-              ListTile(
-                contentPadding: const EdgeInsets.only(left: 32, right: 16),
-                title: Text(collection.name),
-                trailing: Text('${collection.rowCount}'),
-                onTap: () async {
-                  await controller.selectSource(source.sourceId);
-                  await controller.selectCollection(collection.name);
-                },
-              ),
-            const Divider(),
-          ],
         ],
       ),
     );

@@ -3,8 +3,12 @@ import 'package:flutter/material.dart';
 import '../theme/db_lens_theme.dart';
 
 /// Search bar reusable dengan prefix icon, clear button, dan border 3 state.
-class DbLensSearchField extends StatelessWidget {
-  const DbLensSearchField({
+///
+/// Murni presentational — terima [controller]/callback, tidak depend ke
+/// controller `db_lens` apa pun. Bisa dipakai untuk pencarian source,
+/// collection, atau baris tabel.
+class DbLensSearchBar extends StatelessWidget {
+  const DbLensSearchBar({
     super.key,
     required this.controller,
     required this.hintText,

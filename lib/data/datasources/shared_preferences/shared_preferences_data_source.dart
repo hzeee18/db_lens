@@ -98,13 +98,18 @@ class SharedPreferencesDataSource implements LensDataSource {
     Map<String, dynamic> row,
   ) async {
     final key = row['key'] as String?;
+    final expectedType = row['type'] as String?;
+
+    if (column == 'type') {
+      throw ArgumentError('Cannot change the type field (expected "$expectedType").');
+    }
 
     if (column == 'key') {
       if (key == null || newValue is! String || newValue.isEmpty) {
         throw ArgumentError('Invalid key value.');
       }
       final currentValue = _preferences.get(key);
-      final typeName = row['type'] as String? ?? _typeName(currentValue);
+      final typeName = expectedType ?? _typeName(currentValue);
       await _preferences.remove(key);
       await _setValue(newValue, currentValue, typeName);
       return;
@@ -116,8 +121,37 @@ class SharedPreferencesDataSource implements LensDataSource {
 
     if (key == null) throw ArgumentError('Row has no key.');
 
-    final typeName = row['type'] as String? ?? _typeName(newValue);
+    if (expectedType != null && !_valueMatchesType(newValue, expectedType)) {
+      throw ArgumentError(
+        'Value must remain $expectedType (got ${_describeValueType(newValue)}).',
+      );
+    }
+
+    final typeName = expectedType ?? _typeName(newValue);
     await _setValue(key, newValue, typeName);
+  }
+
+  bool _valueMatchesType(Object? value, String type) {
+    switch (type) {
+      case 'bool':
+        return value is bool;
+      case 'int':
+        return value is int;
+      case 'double':
+        return value is double || value is int;
+      case 'String':
+        return value is String;
+      case 'StringList':
+        return value is List && value.every((e) => e is String);
+      default:
+        return true;
+    }
+  }
+
+  String _describeValueType(Object? value) {
+    if (value == null) return 'null';
+    if (value is List) return 'List';
+    return value.runtimeType.toString();
   }
 
   Future<void> _setValue(String key, Object? newValue, String type) async {

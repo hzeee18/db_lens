@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../theme/db_lens_theme.dart';
 
 /// Utilitas format, warna, pencarian, dan sort baris di UI.
-abstract final class RowUtils {
+abstract final class DbLensRowUtils {
   static Color valueColor(Object? value, [DbLensTheme? theme]) {
     final t = theme ?? DbLensTheme();
     if (value == null) return t.syntaxNull;

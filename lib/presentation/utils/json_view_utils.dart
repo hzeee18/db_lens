@@ -1,12 +1,16 @@
 import 'dart:convert';
 
+import 'db_lens_row_id_utils.dart';
+
 /// Utilitas untuk menyiapkan data baris sebagai JSON yang dapat dibaca.
-abstract final class JsonViewUtils {
+abstract final class DbLensJsonUtils {
   static const _encoder = JsonEncoder.withIndent('  ');
 
   /// Siapkan baris untuk tampilan JSON — hapus kolom internal dan parse string JSON.
   static Map<String, Object?> prepareRow(Map<String, Object?> row) {
-    final cleaned = Map<String, Object?>.from(row)..remove('_rowid_');
+    final cleaned = Map<String, Object?>.from(
+      withoutRowIdEntry(Map<String, dynamic>.from(row)),
+    );
     return cleaned.map(
       (key, value) => MapEntry(key, normalizeValue(value)),
     );

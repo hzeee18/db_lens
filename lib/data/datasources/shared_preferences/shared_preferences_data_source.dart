@@ -87,6 +87,10 @@ class SharedPreferencesDataSource implements LensDataSource {
       _allRows();
 
   @override
+  Future<List<String>> identityColumns(String collection) async =>
+      const ['key'];
+
+  @override
   Future<void> updateCell(
     String collection,
     String column,

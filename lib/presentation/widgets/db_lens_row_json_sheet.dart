@@ -68,7 +68,7 @@ class _DbLensRowJsonSheetState extends State<DbLensRowJsonSheet> {
   String? _parseError;
   bool _isJsonValid = true;
 
-  String get _viewJsonText => JsonViewUtils.encodePretty(widget.row);
+  String get _viewJsonText => DbLensJsonUtils.encodePretty(widget.row);
 
   @override
   void initState() {
@@ -88,7 +88,7 @@ class _DbLensRowJsonSheetState extends State<DbLensRowJsonSheet> {
     final text = _editController.text;
     setState(() {
       try {
-        JsonViewUtils.parseRowJson(text);
+        DbLensJsonUtils.parseRowJson(text);
         _parseError = null;
         _isJsonValid = true;
         if (_inlineError != null && _inlineError!.startsWith('Invalid JSON')) {
@@ -127,7 +127,7 @@ class _DbLensRowJsonSheetState extends State<DbLensRowJsonSheet> {
 
     late final Map<String, Object?> parsed;
     try {
-      parsed = JsonViewUtils.parseRowJson(_editController.text);
+      parsed = DbLensJsonUtils.parseRowJson(_editController.text);
     } catch (error) {
       setState(() {
         _inlineError = error is FormatException

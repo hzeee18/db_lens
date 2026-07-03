@@ -19,9 +19,13 @@ import '../../domain/usecases/update_cell_use_case.dart';
 import '../state/db_lens_pagination.dart';
 import '../../core/utils/sql_utils.dart';
 import '../state/db_lens_panel_models.dart';
+import '../utils/db_lens_row_id_utils.dart';
 import '../utils/json_view_utils.dart';
 import '../utils/row_utils.dart';
 
+/// Headless presentation controller. Use with custom UI via
+/// [ListenableBuilder] or [AnimatedBuilder].
+///
 /// Controller presentasi — satu-satunya jembatan UI ke domain layer.
 ///
 /// Mengelola sumber terpilih, koleksi, pagination, loading, dan query SQL.
@@ -89,6 +93,11 @@ class DbLensController extends ChangeNotifier {
   String searchText = '';
   String sourceSearchText = '';
   String collectionSearchText = '';
+  String browseSearchText = '';
+
+  List<BrowseSourceSnapshot> browseSnapshot = [];
+  bool browseLoading = false;
+  bool browseRefreshing = false;
   String? sortColumn;
   bool sortAscending = true;
   String? queryError;
@@ -98,6 +107,11 @@ class DbLensController extends ChangeNotifier {
   DbLensPaginationController<Map<String, Object?>>? pagination;
   String? paginationCollection;
 
+  bool _initialized = false;
+
+  /// Apakah [initialize] sudah pernah dipanggil dan selesai.
+  bool get isInitialized => _initialized;
+
   // ── Derived getters ───────────────────────────────────────────────────────
 
   bool get hasSources => sources.isNotEmpty;
@@ -105,10 +119,36 @@ class DbLensController extends ChangeNotifier {
   List<String> get sourceNames => sources.map((s) => s.name).toList();
 
   List<String> get filteredSourceNames =>
-      RowUtils.filterItems(sourceNames, sourceSearchText);
+      DbLensRowUtils.filterItems(sourceNames, sourceSearchText);
 
   List<String> get filteredCollections =>
-      RowUtils.filterItems(collections, collectionSearchText);
+      DbLensRowUtils.filterItems(collections, collectionSearchText);
+
+  List<BrowseSourceSnapshot> get filteredBrowseSnapshot {
+    final query = browseSearchText.trim().toLowerCase();
+    if (query.isEmpty) return browseSnapshot;
+
+    final filtered = <BrowseSourceSnapshot>[];
+    for (final sourceSnapshot in browseSnapshot) {
+      final sourceMatches =
+          sourceSnapshot.sourceName.toLowerCase().contains(query);
+      final matchingCollections = sourceMatches
+          ? sourceSnapshot.collections
+          : sourceSnapshot.collections
+              .where((c) => c.name.toLowerCase().contains(query))
+              .toList();
+      if (matchingCollections.isEmpty) continue;
+      filtered.add(
+        BrowseSourceSnapshot(
+          source: sourceSnapshot.source,
+          collections: matchingCollections,
+        ),
+      );
+    }
+    return filtered;
+  }
+
+  bool get hasBrowseSnapshot => browseSnapshot.isNotEmpty;
 
   String? get selectedSourceName {
     if (selectedSourceId == null) return null;
@@ -137,7 +177,7 @@ class DbLensController extends ChangeNotifier {
 
   List<String> get activeColumns {
     final cols = queryMode ? queryColumns : columns;
-    return cols.where((c) => c != '_rowid_').toList();
+    return withoutRowIdColumn(cols);
   }
 
   int get activeRowCount => pagination?.totalRows ?? 0;
@@ -165,7 +205,7 @@ class DbLensController extends ChangeNotifier {
   List<Map<String, Object?>> visibleRows({
     required List<String> columns,
   }) {
-    return RowUtils.applySearchAndSort(
+    return DbLensRowUtils.applySearchAndSort(
       rows: activeRows,
       columns: columns,
       searchText: searchText,
@@ -182,6 +222,7 @@ class DbLensController extends ChangeNotifier {
       selectedSourceId = sources.first.id;
       await loadCollections(selectedSourceId!);
     }
+    _initialized = true;
     notifyListeners();
   }
 
@@ -226,6 +267,47 @@ class DbLensController extends ChangeNotifier {
     collectionSearchText = '';
     notifyListeners();
     await loadCollection(collection);
+  }
+
+  /// Memuat snapshot browse: semua sumber, koleksi, dan jumlah baris.
+  Future<List<BrowseSourceSnapshot>> loadBrowseSnapshot() async {
+    browseLoading = true;
+    lastError = null;
+    notifyListeners();
+    try {
+      final snapshot = await _buildBrowseSnapshot();
+      browseSnapshot = snapshot;
+      browseLoading = false;
+      notifyListeners();
+      return snapshot;
+    } catch (error) {
+      browseLoading = false;
+      lastError = 'Failed to load browse snapshot: $error';
+      notifyListeners();
+      return browseSnapshot;
+    }
+  }
+
+  /// Segarkan snapshot browse tanpa mengubah sumber/koleksi terpilih panel.
+  Future<void> refreshBrowse() async {
+    if (browseLoading || browseRefreshing) return;
+    browseRefreshing = true;
+    lastError = null;
+    notifyListeners();
+    try {
+      browseSnapshot = await _buildBrowseSnapshot();
+      browseRefreshing = false;
+      notifyListeners();
+    } catch (error) {
+      browseRefreshing = false;
+      lastError = 'Failed to refresh browse snapshot: $error';
+      notifyListeners();
+    }
+  }
+
+  void setBrowseSearchText(String value) {
+    browseSearchText = value;
+    notifyListeners();
   }
 
   Future<void> loadCollection(String collection, {bool showLoading = true}) async {
@@ -380,8 +462,10 @@ class DbLensController extends ChangeNotifier {
     }
 
     final original = Map<String, Object?>.from(originalRow);
-    final originalDisplay = JsonViewUtils.prepareRow(original);
-    final updated = Map<String, Object?>.from(updatedRow)..remove('_rowid_');
+    final originalDisplay = DbLensJsonUtils.prepareRow(original);
+    final updated = Map<String, Object?>.from(
+      withoutRowIdEntry(Map<String, dynamic>.from(updatedRow)),
+    );
 
     final validationError = _validateRowUpdate(original, updated);
     if (validationError != null) return validationError;
@@ -511,7 +595,11 @@ class DbLensController extends ChangeNotifier {
     try {
       final rows = await _fetchAllActiveRows();
       final exportRows = rows
-          .map((row) => Map<String, Object?>.from(row)..remove('_rowid_'))
+          .map(
+            (row) => Map<String, Object?>.from(
+              withoutRowIdEntry(Map<String, dynamic>.from(row)),
+            ),
+          )
           .toList();
       copyingJson = false;
       notifyListeners();
@@ -527,7 +615,7 @@ class DbLensController extends ChangeNotifier {
   // ── Query ─────────────────────────────────────────────────────────────────
 
   Future<bool> shouldConfirmQuery() =>
-      Future.value(SqlUtils.requiresConfirmation(queryText.trim()));
+      Future.value(DbLensSqlUtils.requiresConfirmation(queryText.trim()));
 
   Future<void> runQuery({bool fromRefresh = false}) async {
     final sourceId = selectedSourceId;
@@ -546,10 +634,10 @@ class DbLensController extends ChangeNotifier {
       return;
     }
 
-    if (SqlUtils.isSelectQuery(sql)) {
+    if (DbLensSqlUtils.isSelectQuery(sql)) {
       _cacheTableViewForQuery();
 
-      final detectedTable = SqlUtils.extractSimpleFromTable(sql);
+      final detectedTable = DbLensSqlUtils.extractSimpleFromTable(sql);
       final tableExists = detectedTable != null &&
           collections.any(
             (c) => c.toLowerCase() == detectedTable.toLowerCase(),
@@ -729,5 +817,32 @@ class DbLensController extends ChangeNotifier {
       columns: List<String>.from(columns),
       columnsTable: columnsTable,
     );
+  }
+
+  Future<List<BrowseSourceSnapshot>> _buildBrowseSnapshot() async {
+    final allSources = await _getSources();
+    sources = allSources;
+
+    final snapshots = <BrowseSourceSnapshot>[];
+    for (final source in allSources) {
+      final collectionEntities = await _getCollections(source.id);
+      final collectionSnapshots = <BrowseCollectionSnapshot>[];
+      for (final collection in collectionEntities) {
+        final rowCount = await _getRowCount(source.id, collection.name);
+        collectionSnapshots.add(
+          BrowseCollectionSnapshot(
+            name: collection.name,
+            rowCount: rowCount,
+          ),
+        );
+      }
+      snapshots.add(
+        BrowseSourceSnapshot(
+          source: source,
+          collections: collectionSnapshots,
+        ),
+      );
+    }
+    return snapshots;
   }
 }

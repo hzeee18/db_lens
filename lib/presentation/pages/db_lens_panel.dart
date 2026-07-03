@@ -7,16 +7,33 @@ import '../../core/models/db_lens_config.dart';
 import '../../db_lens_facade.dart';
 import '../controllers/db_lens_controller.dart';
 import '../theme/db_lens_theme.dart';
+import '../utils/db_lens_row_id_utils.dart';
+import '../utils/db_lens_snackbar.dart';
 import '../utils/json_view_utils.dart';
 import '../utils/row_utils.dart';
+import '../widgets/db_lens_chip.dart';
+import '../widgets/db_lens_history_sheet.dart';
 import '../widgets/db_lens_panel_widgets.dart';
 import '../widgets/db_lens_row_json_sheet.dart';
 
+enum _DbLensDataView { table, list, json }
+
 /// Panel inspeksi database — hanya berinteraksi dengan [DbLensController].
 class DbLensPanel extends StatefulWidget {
-  const DbLensPanel({super.key, this.config = const DbLensConfig()});
+  const DbLensPanel({
+    super.key,
+    this.config = const DbLensConfig(),
+    this.controller,
+  });
 
   final DbLensConfig config;
+
+  /// Jika diisi, panel memakai controller ini dan TIDAK men-dispose-nya
+  /// (lifecycle jadi tanggung jawab caller). Caller harus memanggil
+  /// [DbLensController.initialize] sebelum widget dipasang.
+  ///
+  /// Jika null, panel membuat controller sendiri seperti sebelumnya.
+  final DbLensController? controller;
 
   @override
   State<DbLensPanel> createState() => _DbLensPanelState();
@@ -24,8 +41,9 @@ class DbLensPanel extends StatefulWidget {
 
 class _DbLensPanelState extends State<DbLensPanel> {
   late final DbLensController _controller;
+  late final bool _ownsController;
   bool _isClosing = false;
-  bool _isJsonView = false;
+  _DbLensDataView _dataView = _DbLensDataView.table;
 
   final DraggableScrollableController _sheetController =
       DraggableScrollableController();
@@ -37,9 +55,19 @@ class _DbLensPanelState extends State<DbLensPanel> {
   @override
   void initState() {
     super.initState();
-    _controller = DbLens.createController(config: widget.config);
+    _ownsController = widget.controller == null;
+    _controller = widget.controller ??
+        DbLens.createController(config: widget.config);
     _controller.addListener(_onControllerChanged);
-    _controller.initialize();
+    if (_ownsController) {
+      _controller.initialize();
+    } else {
+      assert(
+        _controller.isInitialized,
+        'Controller passed to DbLensPanel must be initialized before mounting. '
+        'Call controller.initialize() first.',
+      );
+    }
   }
 
   void _onControllerChanged() {
@@ -54,7 +82,9 @@ class _DbLensPanelState extends State<DbLensPanel> {
   @override
   void dispose() {
     _controller.removeListener(_onControllerChanged);
-    _controller.dispose();
+    if (_ownsController) {
+      _controller.dispose();
+    }
     _sheetController.dispose();
     _searchController.dispose();
     _queryController.dispose();
@@ -74,33 +104,7 @@ class _DbLensPanelState extends State<DbLensPanel> {
   }
 
   void _showSnackBar(String message, {bool isError = false}) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            Icon(
-              isError ? Icons.error_outline : Icons.check_circle_outline,
-              color: isError ? Colors.redAccent : _theme.accent,
-              size: 18,
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                message,
-                style: TextStyle(color: _theme.textPrimary),
-              ),
-            ),
-          ],
-        ),
-        duration: const Duration(seconds: 2),
-        behavior: SnackBarBehavior.floating,
-        backgroundColor: _theme.bg,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-          side: BorderSide(color: _theme.border),
-        ),
-      ),
-    );
+    showDbLensSnack(context, message, isError: isError);
   }
 
   Future<void> _confirmAndRunQuery() async {
@@ -133,8 +137,8 @@ class _DbLensPanelState extends State<DbLensPanel> {
     await _controller.runQuery();
   }
 
-  void _toggleJsonView() {
-    setState(() => _isJsonView = !_isJsonView);
+  void _setDataView(_DbLensDataView view) {
+    setState(() => _dataView = view);
   }
 
   Future<void> _copyAllAsJson() async {
@@ -187,7 +191,6 @@ class _DbLensPanelState extends State<DbLensPanel> {
         minChildSize: DbLensTheme.minChildSize,
         maxChildSize: DbLensTheme.maxChildSize,
         builder: (context, scrollController) {
-          // final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
           return AnimatedBuilder(
             animation: _sheetController,
             builder: (context, _) {
@@ -199,23 +202,20 @@ class _DbLensPanelState extends State<DbLensPanel> {
                     FocusManager.instance.primaryFocus?.unfocus(),
                 child: DecoratedBox(
                   decoration: _theme.sheetDecoration(size: sheetSize),
-                  child: Container(
-                    // padding: EdgeInsets.only(bottom: bottomInset),
-                    child: CustomScrollView(
-                      controller: scrollController,
-                      keyboardDismissBehavior:
-                          ScrollViewKeyboardDismissBehavior.onDrag,
-                      slivers: [
-                        SliverToBoxAdapter(child: _buildTopSection(c)),
-                        if (!c.hasSources)
-                          SliverFillRemaining(
-                            hasScrollBody: false,
-                            child: _buildEmptyState(),
-                          )
-                        else
-                          ..._buildDataSlivers(c),
-                      ],
-                    ),
+                  child: CustomScrollView(
+                    controller: scrollController,
+                    keyboardDismissBehavior:
+                        ScrollViewKeyboardDismissBehavior.onDrag,
+                    slivers: [
+                      SliverToBoxAdapter(child: _buildTopSection(c)),
+                      if (!c.hasSources)
+                        SliverFillRemaining(
+                          hasScrollBody: false,
+                          child: _buildEmptyState(),
+                        )
+                      else
+                        ..._buildDataSlivers(c),
+                    ],
                   ),
                 ),
               );
@@ -302,6 +302,25 @@ class _DbLensPanelState extends State<DbLensPanel> {
               ],
             ),
           ),
+          if (c.selectedSourceId != null)
+            IconButton(
+              tooltip: 'History',
+              visualDensity: VisualDensity.compact,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+              onPressed: () => _showHistorySheet(c),
+              style: IconButton.styleFrom(
+                backgroundColor: _theme.accentSoft,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(7),
+                  side: BorderSide(
+                    color: _theme.accent.withValues(alpha: 0.25),
+                  ),
+                ),
+              ),
+              icon: Icon(Icons.history, size: 15, color: _theme.accent),
+            ),
+          if (c.selectedSourceId != null) const SizedBox(width: 6),
           if (c.selectedCollection != null || c.queryMode)
             _buildRowCountBadge(c),
         ],
@@ -310,22 +329,12 @@ class _DbLensPanelState extends State<DbLensPanel> {
   }
 
   Widget _buildRowCountBadge(DbLensController c) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: _theme.surface,
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: _theme.border),
-      ),
-      child: Text(
-        '${c.activeRowCount} rows',
-        style: TextStyle(
-          color: _theme.textSecondary,
-          fontSize: 11,
-          fontWeight: FontWeight.w500,
-          letterSpacing: -0.2,
-        ),
-      ),
+    return DbLensChip(
+      label: '${c.activeRowCount} rows',
+      foreground: _theme.textSecondary,
+      background: _theme.surface,
+      borderColor: _theme.border,
+      borderRadius: 6,
     );
   }
 
@@ -635,14 +644,16 @@ class _DbLensPanelState extends State<DbLensPanel> {
             children: [
               AnimatedSwitcher(
                 duration: const Duration(milliseconds: 200),
-                child: _isJsonView
-                    ? _buildJsonArrayView(visibleRows)
-                    : SingleChildScrollView(
-                        key: const ValueKey('table-view'),
-                        scrollDirection: Axis.horizontal,
-                        primary: false,
-                        child: _buildDataTable(c, visibleRows, columns),
-                      ),
+                child: switch (_dataView) {
+                  _DbLensDataView.json => _buildJsonArrayView(visibleRows),
+                  _DbLensDataView.list => _buildListView(c, visibleRows, columns),
+                  _DbLensDataView.table => SingleChildScrollView(
+                      key: const ValueKey('table-view'),
+                      scrollDirection: Axis.horizontal,
+                      primary: false,
+                      child: _buildDataTable(c, visibleRows, columns),
+                    ),
+                },
               ),
               if (c.isPageTransition)
                 Positioned.fill(
@@ -663,12 +674,121 @@ class _DbLensPanelState extends State<DbLensPanel> {
     ];
   }
 
+  Widget _buildListView(
+    DbLensController c,
+    List<Map<String, Object?>> rows,
+    List<String> columns,
+  ) {
+    return Padding(
+      key: const ValueKey('list-view'),
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        children: [
+          for (final entry in rows.asMap().entries)
+            _buildListCard(
+              c,
+              entry.value,
+              columns,
+              (c.pagination?.rangeStart ?? 1) + entry.key,
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildListCard(
+    DbLensController c,
+    Map<String, Object?> row,
+    List<String> columns,
+    int rowNum,
+  ) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: _theme.surface,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: _theme.border),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(10),
+        onTap: () => _showRowJsonView(row, rowNum: rowNum),
+        onLongPress: () => _copyRow(row),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '#$rowNum',
+                style: TextStyle(
+                  color: _theme.textMuted,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.3,
+                ),
+              ),
+              const SizedBox(height: 6),
+              for (final col in columns)
+                if (col != kDbLensRowIdColumn) _buildListField(c, col, row),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildListField(
+    DbLensController c,
+    String col,
+    Map<String, Object?> row,
+  ) {
+    final value = row[col];
+    final formatted = DbLensRowUtils.formatValue(value);
+    final editable = c.canEditCells;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: GestureDetector(
+        onLongPress: editable
+            ? () => _showEditCellDialog(
+                  column: col,
+                  currentValue: value,
+                  row: row,
+                )
+            : null,
+        behavior: HitTestBehavior.opaque,
+        child: RichText(
+          text: TextSpan(
+            children: [
+              TextSpan(
+                text: '$col: ',
+                style: TextStyle(
+                  color: _theme.textMuted,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              TextSpan(
+                text: formatted,
+                style: TextStyle(
+                  color: DbLensRowUtils.valueColor(value, _theme),
+                  fontSize: DbLensTheme.dataFontSize,
+                  fontStyle: value == null ? FontStyle.italic : FontStyle.normal,
+                  height: 1.35,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildJsonArrayView(List<Map<String, Object?>> rows) {
     return Padding(
       key: const ValueKey('json-view'),
       padding: const EdgeInsets.all(16),
       child: SelectableText(
-        JsonViewUtils.encodePrettyArray(rows),
+        DbLensJsonUtils.encodePrettyArray(rows),
         style: TextStyle(
           fontSize: DbLensTheme.dataFontSize,
           height: 1.5,
@@ -680,20 +800,16 @@ class _DbLensPanelState extends State<DbLensPanel> {
   }
 
   Widget _buildCustomQueryBanner(DbLensController c) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      color: _theme.accentSoft,
-      child: Row(
-        children: [
-          Icon(Icons.query_stats, size: 14, color: _theme.accent),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              'Custom query result — collection not switched',
-              style: TextStyle(color: _theme.accent, fontSize: 11),
-            ),
-          ),
-        ],
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      child: DbLensChip(
+        icon: Icons.query_stats,
+        label: 'Custom query result — collection not switched',
+        foreground: _theme.accent,
+        background: _theme.accentSoft,
+        borderColor: _theme.accent.withValues(alpha: 0.25),
+        borderRadius: 8,
+        expandWidth: true,
       ),
     );
   }
@@ -709,11 +825,15 @@ class _DbLensPanelState extends State<DbLensPanel> {
             ? '${pagination.rangeStart}–${pagination.rangeEnd} of ${pagination.totalRows}'
             : '0 rows';
 
-    final hintText = _isJsonView
-        ? 'Current page as JSON · copy button copies all rows'
-        : c.canEditCells
-            ? 'Tap row to view JSON · long-press cell to edit'
-            : 'Tap row to view JSON · long-press index to copy';
+    final hintText = switch (_dataView) {
+      _DbLensDataView.json => 'Current page as JSON · copy button copies all rows',
+      _DbLensDataView.list => c.canEditCells
+          ? 'Tap card to view JSON · long-press a field to edit'
+          : 'Tap card to view JSON · long-press card to copy',
+      _DbLensDataView.table => c.canEditCells
+          ? 'Tap row to view JSON · long-press cell to edit'
+          : 'Tap row to view JSON · long-press index to copy',
+    };
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -739,34 +859,36 @@ class _DbLensPanelState extends State<DbLensPanel> {
             ),
           ),
           const SizedBox(width: 4),
-          IconButton(
-            tooltip:
-                _isJsonView ? 'Switch to table view' : 'Switch to JSON view',
-            onPressed: _toggleJsonView,
-            visualDensity: VisualDensity.compact,
-            icon: Icon(
-              _isJsonView
-                  ? Icons.table_rows_outlined
-                  : Icons.data_object_outlined,
-              size: 18,
-              color: _theme.accent,
-            ),
+          _buildViewToggleButton(
+            icon: Icons.table_rows_outlined,
+            tooltip: 'Table view',
+            view: _DbLensDataView.table,
           ),
-          // IconButton(
-          //   tooltip: 'Copy all as JSON',
-          //   onPressed: c.canCopyJson && !c.copyingJson ? _copyAllAsJson : null,
-          //   visualDensity: VisualDensity.compact,
-          //   icon: c.copyingJson
-          //       ? SizedBox(
-          //           width: 14,
-          //           height: 14,
-          //           child: CircularProgressIndicator(
-          //             strokeWidth: 2,
-          //             color: _theme.accent,
-          //           ),
-          //         )
-          //       : Icon(Icons.content_copy, size: 18, color: _theme.accent),
-          // ),
+          _buildViewToggleButton(
+            icon: Icons.view_agenda_outlined,
+            tooltip: 'List view',
+            view: _DbLensDataView.list,
+          ),
+          _buildViewToggleButton(
+            icon: Icons.data_object_outlined,
+            tooltip: 'JSON view',
+            view: _DbLensDataView.json,
+          ),
+          IconButton(
+            tooltip: 'Copy all as JSON',
+            onPressed: c.canCopyJson && !c.copyingJson ? _copyAllAsJson : null,
+            visualDensity: VisualDensity.compact,
+            icon: c.copyingJson
+                ? SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: _theme.accent,
+                    ),
+                  )
+                : Icon(Icons.content_copy, size: 18, color: _theme.accent),
+          ),
           IconButton(
             tooltip: 'Refresh',
             onPressed: c.canRefresh ? _controller.refresh : null,
@@ -783,6 +905,24 @@ class _DbLensPanelState extends State<DbLensPanel> {
                 : const Icon(Icons.refresh_rounded, size: 18),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildViewToggleButton({
+    required IconData icon,
+    required String tooltip,
+    required _DbLensDataView view,
+  }) {
+    final isActive = _dataView == view;
+    return IconButton(
+      tooltip: tooltip,
+      onPressed: () => _setDataView(view),
+      visualDensity: VisualDensity.compact,
+      icon: Icon(
+        icon,
+        size: 18,
+        color: isActive ? _theme.accent : _theme.textMuted,
       ),
     );
   }
@@ -818,7 +958,7 @@ class _DbLensPanelState extends State<DbLensPanel> {
               _buildIndexCell(rowNum, row),
               ...columns.map((col) {
                 final value = row[col];
-                final formatted = RowUtils.formatValue(value);
+                final formatted = DbLensRowUtils.formatValue(value);
                 final display = formatted.length > 48
                     ? '${formatted.substring(0, 48)}…'
                     : formatted;
@@ -828,7 +968,7 @@ class _DbLensPanelState extends State<DbLensPanel> {
                   column: col,
                   row: row,
                   rowNum: rowNum,
-                  editable: c.canEditCells && col != '_rowid_',
+                  editable: c.canEditCells && col != kDbLensRowIdColumn,
                 );
               }),
             ],
@@ -900,6 +1040,28 @@ class _DbLensPanelState extends State<DbLensPanel> {
     );
   }
 
+  Future<void> _showHistorySheet(DbLensController c) async {
+    final sourceId = c.selectedSourceId;
+    if (sourceId == null) return;
+
+    final historyController = DbLens.createHistoryController();
+    await historyController.loadFor(sourceId);
+
+    if (!mounted) {
+      historyController.dispose();
+      return;
+    }
+
+    await DbLensHistorySheet.show(
+      context,
+      controller: historyController,
+      theme: _theme,
+      sourceName: c.selectedSourceName ?? sourceId,
+    );
+
+    historyController.dispose();
+  }
+
   Widget _buildIndexCell(int rowNum, Map<String, Object?> row) {
     return GestureDetector(
       onTap: () => _showRowJsonView(row, rowNum: rowNum),
@@ -953,7 +1115,7 @@ class _DbLensPanelState extends State<DbLensPanel> {
           child: Text(
             display,
             style: TextStyle(
-              color: RowUtils.valueColor(value, _theme),
+              color: DbLensRowUtils.valueColor(value, _theme),
               fontSize: DbLensTheme.dataFontSize,
               fontStyle: isNull ? FontStyle.italic : FontStyle.normal,
               height: 1.35,
@@ -965,7 +1127,9 @@ class _DbLensPanelState extends State<DbLensPanel> {
   }
 
   void _copyRow(Map<String, Object?> row) {
-    final exportRow = Map<String, Object?>.from(row)..remove('_rowid_');
+    final exportRow = Map<String, Object?>.from(
+      withoutRowIdEntry(Map<String, dynamic>.from(row)),
+    );
     Clipboard.setData(ClipboardData(text: jsonEncode(exportRow)));
     _showSnackBar('Copied as JSON');
   }

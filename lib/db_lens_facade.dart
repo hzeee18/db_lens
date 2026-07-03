@@ -3,15 +3,21 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 
+import 'core/enums/db_lens_presentation_mode.dart';
 import 'core/models/db_lens_config.dart';
 import 'data/datasources/lens_datasource.dart';
+import 'data/history/history_data_source.dart';
+import 'data/history/history_database.dart';
+import 'data/history/history_repository_impl.dart';
 import 'data/registry/db_lens_registry.dart';
 import 'data/repositories/lens_repository_impl.dart';
 import 'domain/repositories/lens_repository.dart';
+import 'domain/usecases/clear_history_use_case.dart';
 import 'domain/usecases/execute_statement_use_case.dart';
 import 'domain/usecases/get_all_rows_use_case.dart';
 import 'domain/usecases/get_collections_use_case.dart';
 import 'domain/usecases/get_columns_use_case.dart';
+import 'domain/usecases/get_history_use_case.dart';
 import 'domain/usecases/get_row_count_use_case.dart';
 import 'domain/usecases/get_rows_use_case.dart';
 import 'domain/usecases/get_sources_use_case.dart';
@@ -19,6 +25,8 @@ import 'domain/usecases/run_raw_query_count_use_case.dart';
 import 'domain/usecases/run_raw_query_paged_use_case.dart';
 import 'domain/usecases/update_cell_use_case.dart';
 import 'presentation/controllers/db_lens_controller.dart';
+import 'presentation/controllers/db_lens_history_controller.dart';
+import 'presentation/pages/db_lens_custom_host.dart';
 import 'presentation/pages/db_lens_panel.dart';
 import 'presentation/theme/db_lens_theme.dart';
 import 'presentation/theme/db_lens_theme_data.dart';
@@ -33,7 +41,18 @@ import 'presentation/theme/db_lens_theme_data.dart';
 class DbLens {
   DbLens._();
 
-  static final DbLensRegistry registry = DbLensRegistry();
+  static final HistoryDataSource _historyDataSource =
+      HistoryDataSource(HistoryDatabase.instance);
+
+  static final HistoryRepositoryImpl _historyRepository =
+      HistoryRepositoryImpl(_historyDataSource);
+
+  static final DbLensRegistry registry = DbLensRegistry(
+    historyDataSource: kReleaseMode ? null : _historyDataSource,
+    historyRepository: kReleaseMode ? null : _historyRepository,
+    pollInterval: DbLensConfig.defaultHistoryPollInterval,
+    enableHistory: !kReleaseMode,
+  );
 
   static final LensRepository _repository = LensRepositoryImpl(registry);
 
@@ -56,6 +75,10 @@ class DbLens {
       UpdateCellUseCase(_repository);
   static final GetAllRowsUseCase _getAllRows =
       GetAllRowsUseCase(_repository);
+  static final GetHistoryUseCase _getHistory =
+      GetHistoryUseCase(_historyRepository);
+  static final ClearHistoryUseCase _clearHistory =
+      ClearHistoryUseCase(_historyRepository);
 
   /// Register a sqflite [database] with a display [name].
   static void register(String name, Database database) {
@@ -95,6 +118,7 @@ class DbLens {
 
   /// Membuat controller untuk panel (dipakai internal / testing).
   static DbLensController createController({DbLensConfig? config}) {
+    final panelConfig = config ?? const DbLensConfig();
     return DbLensController(
       getSources: _getSources,
       getCollections: _getCollections,
@@ -107,32 +131,145 @@ class DbLens {
       updateCell: _updateCell,
       getAllRows: _getAllRows,
       repository: _repository,
-      config: config ?? const DbLensConfig(),
+      config: panelConfig,
+    );
+  }
+
+  /// Membuat controller untuk sheet riwayat perubahan data.
+  static DbLensHistoryController createHistoryController() {
+    return DbLensHistoryController(
+      getHistory: _getHistory,
+      clearHistory: _clearHistory,
+      historyRepository: _historyRepository,
+    );
+  }
+
+  /// Konfigurasi pelacakan riwayat perubahan data.
+  static void configureHistory({
+    bool? enabled,
+    Duration? pollInterval,
+  }) {
+    if (kReleaseMode) return;
+    registry.configureHistory(
+      enabled: enabled,
+      pollInterval: pollInterval,
     );
   }
 
   /// Open the DbLens panel.
   ///
   /// Tidak berjalan di release build ([kReleaseMode]).
-  static void open(
+  static Future<void> open(
     BuildContext context, {
     DbLensConfig? config,
     DbLensThemeData? theme,
-  }) {
+    DbLensPresentationMode? mode,
+  }) async {
+    if (kReleaseMode) return;
+
+    final panelConfig = config ?? const DbLensConfig();
+    final effectiveMode = mode ?? panelConfig.presentationMode;
+
+    switch (effectiveMode) {
+      case DbLensPresentationMode.fullPage:
+        await openPage(
+          context,
+          config: panelConfig,
+          theme: theme,
+          fullscreenDialog: panelConfig.fullscreenDialog,
+        );
+        return;
+      case DbLensPresentationMode.embedded:
+        assert(
+          false,
+          'DbLensPresentationMode.embedded tidak bisa dipakai lewat DbLens.open(). '
+          'Gunakan DbLens.buildPanel() dan tempatkan widget-nya sendiri.',
+        );
+        return;
+      case DbLensPresentationMode.bottomSheet:
+        final panelTheme = DbLensTheme(theme);
+        await showModalBottomSheet(
+          context: context,
+          isScrollControlled: true,
+          backgroundColor: Colors.transparent,
+          barrierColor: Colors.black54,
+          enableDrag: false,
+          useSafeArea: true,
+          builder: (_) => DbLensThemeScope(
+            theme: panelTheme,
+            child: DbLensPanel(config: panelConfig),
+          ),
+        );
+        return;
+    }
+  }
+
+  /// Buka inspector sebagai halaman penuh via [Navigator.push].
+  static Future<void> openPage(
+    BuildContext context, {
+    DbLensConfig? config,
+    DbLensThemeData? theme,
+    bool fullscreenDialog = true,
+  }) async {
     if (kReleaseMode) return;
 
     final panelConfig = config ?? const DbLensConfig();
     final panelTheme = DbLensTheme(theme);
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      barrierColor: Colors.black54,
-      enableDrag: false,
-      useSafeArea: true,
-      builder: (_) => DbLensThemeScope(
-        theme: panelTheme,
-        child: DbLensPanel(config: panelConfig),
+
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        fullscreenDialog: fullscreenDialog,
+        builder: (_) => DbLensThemeScope(
+          theme: panelTheme,
+          child: Scaffold(
+            backgroundColor: Colors.transparent,
+            body: DbLensPanel(config: panelConfig),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Widget inspector yang bisa di-embed di widget tree konsumen.
+  static Widget buildPanel({
+    DbLensConfig? config,
+    DbLensThemeData? theme,
+    DbLensController? controller,
+  }) {
+    if (kReleaseMode) return const SizedBox.shrink();
+
+    final panelConfig = config ?? const DbLensConfig();
+    final panelTheme = DbLensTheme(theme);
+
+    return DbLensThemeScope(
+      theme: panelTheme,
+      child: DbLensPanel(
+        config: panelConfig,
+        controller: controller,
+      ),
+    );
+  }
+
+  /// Buka shell UI custom sepenuhnya dengan [DbLensController] headless.
+  static Future<void> openCustom(
+    BuildContext context, {
+    required Widget Function(BuildContext context, DbLensController controller)
+        builder,
+    DbLensConfig? config,
+    DbLensThemeData? theme,
+  }) async {
+    if (kReleaseMode) return;
+
+    final panelConfig = config ?? const DbLensConfig();
+
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        fullscreenDialog: panelConfig.fullscreenDialog,
+        builder: (_) => DbLensCustomHost(
+          builder: builder,
+          config: panelConfig,
+          theme: theme,
+        ),
       ),
     );
   }

@@ -1,3 +1,31 @@
+## 0.0.6
+
+* Browse snapshot API untuk custom full-page inspector — `loadBrowseSnapshot()`, `refreshBrowse()`, `setBrowseSearchText()`, dan `filteredBrowseSnapshot` di `DbLensController`
+* Model `BrowseSourceSnapshot` / `BrowseCollectionSnapshot` untuk daftar semua sumber + koleksi beserta row count di awal
+* `DbLensCustomHost` menerima `controller` opsional (sama seperti `DbLensInspectorScope`) agar route detail bisa berbagi controller
+* Example app: browse home + detail route dengan controller bersama
+* Change History — pelacakan insert/update/delete otomatis lewat polling + diffing untuk semua collection yang terdaftar
+* Riwayat disimpan permanen di database privat db_lens (`db_lens_history.db`) dengan opsi clear per source
+* Panel History di level source (tombol di header) menampilkan entri dengan detail before/after JSON
+* `DbLens.configureHistory()` dan `DbLens.createHistoryController()` sebagai API publik baru
+* `LensDataSource.identityColumns()` — method baru untuk identitas baris saat diffing (breaking change minor untuk custom implementer)
+* Export `DbLensController` sebagai public headless API untuk custom UI
+* Tambah `DbLensPresentationMode` (bottomSheet, fullPage, embedded)
+* Tambah `DbLens.openPage()` untuk inspector full-screen
+* Tambah `DbLens.openCustom()` builder hook untuk shell UI custom sepenuhnya
+* Tambah `DbLens.buildPanel()` untuk widget inspector yang di-embed
+* Tambah `DbLensInspectorScope` untuk manajemen lifecycle controller di custom UI
+* Extend `DbLensConfig` dengan `presentationMode` dan `fullscreenDialog`
+* Dokumentasi pattern custom UI di README/doc/custom_ui.md
+* Example app: demo full-page dan custom controller
+
+# 0.0.5
+
+* Remove Excel export and drop `excel` / `share_plus` dependencies
+* Replace export menu with a dedicated copy-all-JSON toolbar button
+* `DbLensThemeData.fromMaterialTheme()` uses a fixed warm palette (accent still follows app primary)
+* Panel typography uses the default font instead of monospace
+
 ## 0.0.4
 
 * Dynamic theme support via `DbLensThemeData` and `DbLensThemeData.fromMaterialTheme()`

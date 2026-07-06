@@ -3,16 +3,16 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../core/enums/source_type.dart';
 import '../../core/models/db_lens_config.dart';
 import '../../db_lens_facade.dart';
 import '../controllers/db_lens_controller.dart';
-import '../hooks/db_lens_cell_editor_builder.dart';
 import '../scope/db_lens_controller_scope.dart';
 import '../state/db_lens_pagination.dart';
 import '../theme/db_lens_theme.dart';
+import '../utils/db_lens_cell_edit.dart';
 import '../utils/db_lens_row_id_utils.dart';
 import '../utils/db_lens_snackbar.dart';
-import '../widgets/db_lens_cell_editor.dart';
 import '../widgets/db_lens_chip.dart';
 import '../widgets/db_lens_collection_list.dart';
 import '../widgets/db_lens_empty_state.dart';
@@ -131,16 +131,14 @@ class _DbLensPanelSheetState extends State<_DbLensPanelSheet> {
     final c = DbLensControllerScope.of(context);
     if (!c.canEditCells) return;
 
-    Object? result;
-    try {
-      result = await DbLensCellEditor.show(context, column, currentValue);
-    } on DbLensCellEditCancelled {
-      return;
-    }
-
-    if (!mounted) return;
-    final success = await c.updateCellValue(column: column, newValue: result, row: row);
-    if (success && mounted) _showSnackBar('Cell updated');
+    await DbLensCellEdit.run(
+      context,
+      column: column,
+      currentValue: currentValue,
+      row: row,
+      controller: c,
+      isSQLite: c.source.selectedSourceType != SourceType.sharedPreferences,
+    );
   }
 
   void _showRowJsonView(Map<String, Object?> row, {int? rowNum}) {
@@ -453,9 +451,8 @@ class _DbLensPanelSheetState extends State<_DbLensPanelSheet> {
                         rows: visibleRows,
                         columns: columns,
                         rowNumberStart: (c.table.pagination?.rangeStart ?? 1),
+                        searchQuery: c.table.searchText,
                         canEditColumn: (col) => c.canEditCells && col != kDbLensRowIdColumn,
-                        onEditCell: (col, value, row) =>
-                            _showEditCellDialog(column: col, currentValue: value, row: row),
                         onCopyRow: _copyRow,
                       ),
                     _DbLensDataView.table => DbLensTableView(

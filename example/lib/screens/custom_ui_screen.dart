@@ -181,24 +181,6 @@ class _CollectionDetailScreenState extends State<_CollectionDetailScreen> {
     super.dispose();
   }
 
-  Future<void> _editCell(String column, Object? currentValue, Map<String, Object?> row) async {
-    final c = DbLensControllerScope.of(context);
-
-    Object? newValue;
-    try {
-      newValue = await DbLensCellEditor.show(context, column, currentValue);
-    } on DbLensCellEditCancelled {
-      return;
-    }
-
-    if (!mounted) return;
-    final ok = await c.updateCellValue(column: column, newValue: newValue, row: row);
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(ok ? 'Updated' : 'Update failed')),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final c = DbLensControllerScope.of(context);
@@ -245,7 +227,6 @@ class _CollectionDetailScreenState extends State<_CollectionDetailScreen> {
                             rows: rows,
                             columns: columns,
                             canEditColumn: (_) => c.canEditCells,
-                            onEditCell: _editCell,
                           ),
               ),
             ],

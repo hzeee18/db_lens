@@ -18,7 +18,7 @@ A Flutter **Database Inspector Framework** for inspecting SQLite and SharedPrefe
 
 ```yaml
 dev_dependencies:
-  db_lens: ^1.0.1
+  db_lens: ^1.0.2
 ```
 
 ---

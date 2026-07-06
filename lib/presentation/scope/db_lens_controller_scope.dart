@@ -55,6 +55,13 @@ class DbLensControllerScope extends StatefulWidget {
     return scope!.controller;
   }
 
+  /// Returns null when no [DbLensControllerScope] ancestor exists.
+  static DbLensController? maybeOf(BuildContext context) {
+    return context
+        .getInheritedWidgetOfExactType<_DbLensControllerInherited>()
+        ?.controller;
+  }
+
   @override
   State<DbLensControllerScope> createState() => _DbLensControllerScopeState();
 }

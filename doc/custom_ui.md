@@ -190,7 +190,7 @@ All widgets are headless/reusable and exported from `package:db_lens/db_lens.dar
 | `DbLensSourceList` | Source selector list |
 | `DbLensCollectionList` | Collection selector list |
 | `DbLensTableView` | Table view with column headers |
-| `DbLensListView` | Scrollable row list with edit support |
+| `DbLensListView` | Expandable row cards — search highlight, copy JSON, default cell edit |
 | `DbLensDataGrid` | Grid-style data display |
 | `DbLensJsonView` | Pretty-printed JSON view |
 | `DbLensEmptyState` | Empty placeholder |
@@ -206,7 +206,7 @@ All widgets are headless/reusable and exported from `package:db_lens/db_lens.dar
 | `DbLensRefreshAction` | Refresh icon button |
 | `DbLensQueryEditor` | SQL input with history |
 | `DbLensQueryHistoryList` | Session SQL history list |
-| `DbLensCellEditor` | Cell value editor dialog |
+| `DbLensCellEditor` | Type-aware cell edit dialog (type badge, validation) |
 | `DbLensPaginationBar` | Page navigation |
 | `DbLensStatusBar` | Status bar slot |
 | `DbLensButton` | Ready-made trigger button |
@@ -222,11 +222,45 @@ All widgets are headless/reusable and exported from `package:db_lens/db_lens.dar
 
 ### Utilities
 
-| Widget | Purpose |
+| Widget / API | Purpose |
 |---|---|
+| `DbLensCellEdit.run()` | Default edit flow — dialog + save via callback or controller |
 | `DbLensRowJsonSheet` | Row JSON bottom sheet |
 | `DbLensHighlightedText` | Search highlight text |
 | `DbLensChip` | Small label chip |
+
+---
+
+## Cell editing
+
+`DbLensListView` opens the default edit dialog automatically when `canEditColumn` allows it and no custom `onEditCell` is provided — as long as a `DbLensControllerScope` ancestor exists:
+
+```dart
+DbLensListView(
+  rows: rows,
+  columns: columns,
+  searchQuery: c.table.searchText,
+  canEditColumn: (col) => c.canEditCells && col != '_rowid_',
+)
+```
+
+For custom UI without a controller (e.g. direct `LensDataSource` access), pass `onSaveCell`:
+
+```dart
+DbLensListView(
+  rows: rows,
+  columns: columns,
+  canEditColumn: _canEditField,
+  isSQLite: source.sourceType == SourceType.sqlite,
+  onSaveCell: (column, newValue, row) async {
+    await source.updateCell(collection, column, newValue, row);
+    await reload();
+    return true;
+  },
+)
+```
+
+Override the dialog entirely with `onEditCell`, or call `DbLensCellEdit.run()` / `DbLensCellEditor.show()` directly.
 
 ---
 

@@ -1,3 +1,7 @@
+## 1.0.4
+
+* **`DbLensQueryConsole`** — full-page SQL console widget (dark editor, table chips, session history, result grid with CSV/JSON copy). Works standalone via `DbLens.runRawQuery` / `DbLens.executeStatement` — no `DbLensController` required. Open with `DbLensQueryConsole.push(context, source: ..., tableNames: ...)`.
+
 ## 1.0.3
 
 * **`DbLensListView`** — removed small edit icon beside column labels in expanded row cards for a cleaner UI; cell edit still works via long-press on the value or the edit button on the right.

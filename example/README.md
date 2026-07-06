@@ -19,6 +19,7 @@ The example seeds a SQLite database and SharedPreferences, then registers both w
 | **Presentation Mode** | Side-by-side comparison of `bottomSheet` vs `fullPage` |
 | **Embedded Panel** | `DbLens.buildPanel()` embedded directly in a `Scaffold` body |
 | **Custom UI** | `DbLensControllerScope` + public widgets (`DbLensSearchBar`, `DbLensListView`, `DbLensQueryEditor`, etc.) with a shared controller across routes |
+| **Query Console** | `DbLensQueryConsole.push()` — full-page SQL console without controller |
 | **Change History** | `DbLens.configureHistory()`, `DbLens.createHistoryController()`, `DbLensHistorySheet` |
 
 ## Files
@@ -28,6 +29,7 @@ lib/
 ├── main.dart                          # Home screen with demo list
 ├── screens/
 │   ├── custom_ui_screen.dart          # Custom compose pattern
+│   ├── query_console_screen.dart      # DbLensQueryConsole.push()
 │   ├── embedded_panel_screen.dart     # buildPanel pattern
 │   ├── history_demo_screen.dart       # Change history
 │   └── presentation_modes_screen.dart # presentationMode config

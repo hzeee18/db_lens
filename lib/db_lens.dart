@@ -73,6 +73,7 @@ export 'presentation/widgets/db_lens_json_view.dart';
 export 'presentation/widgets/db_lens_list_view.dart';
 export 'presentation/widgets/db_lens_loading_view.dart';
 export 'presentation/widgets/db_lens_pagination_bar.dart';
+export 'presentation/widgets/db_lens_query_console.dart';
 export 'presentation/widgets/db_lens_query_editor.dart';
 export 'presentation/widgets/db_lens_query_history_list.dart';
 export 'presentation/widgets/db_lens_row_json_sheet.dart';

@@ -26,13 +26,19 @@ class DbLensCellEditor extends StatefulWidget {
     bool isSQLite = true,
     DbLensTheme? theme,
   }) async {
+    // Dialog route sits outside the caller subtree — resolve theme here so
+    // buttons and fields use the app palette instead of [DbLensThemeData.defaults].
+    final resolvedTheme = theme ?? DbLensThemeScope.of(context);
     final result = await showDialog<_EditResult>(
       context: context,
-      builder: (_) => DbLensCellEditor(
-        column: column,
-        currentValue: currentValue,
-        isSQLite: isSQLite,
-        theme: theme,
+      builder: (_) => DbLensThemeScope(
+        theme: resolvedTheme,
+        child: DbLensCellEditor(
+          column: column,
+          currentValue: currentValue,
+          isSQLite: isSQLite,
+          theme: resolvedTheme,
+        ),
       ),
     );
     if (result == null || result.cancelled) {

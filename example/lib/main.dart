@@ -7,6 +7,7 @@ import 'screens/custom_ui_screen.dart';
 import 'screens/embedded_panel_screen.dart';
 import 'screens/history_demo_screen.dart';
 import 'screens/presentation_modes_screen.dart';
+import 'screens/query_console_screen.dart';
 import 'seed/shared_preferences_seeder.dart';
 import 'seed/sqlite_seeder.dart';
 
@@ -103,6 +104,13 @@ class HomeScreen extends StatelessWidget {
               'Compose widget sendiri: DbLensControllerScope + DbLensLayout + widget publik',
           icon: Icons.widgets_outlined,
           builder: (context) => const CustomUiScreen(),
+        ),
+        _DemoItem(
+          title: 'Query Console',
+          subtitle:
+              'DbLensQueryConsole — SQL editor penuh tanpa controller',
+          icon: Icons.terminal_rounded,
+          builder: (context) => const QueryConsoleScreen(),
         ),
         _DemoItem(
           title: 'Change History',

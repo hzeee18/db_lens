@@ -2,27 +2,29 @@ import 'package:flutter/material.dart';
 
 import '../controllers/db_lens_history_controller.dart';
 import '../theme/db_lens_theme.dart';
+import 'db_lens_history_header.dart';
 import 'db_lens_history_panel.dart';
 
-/// Wrapper tipis yang menampilkan [DbLensHistoryPanel] sebagai modal bottom
-/// sheet. Untuk tampilan full-page/embed, pakai [DbLensHistoryPanel]
-/// langsung di `Scaffold`/widget tree sendiri.
+/// Bottom-sheet wrapper for [DbLensHistoryHeader] + [DbLensHistoryPanel].
 class DbLensHistorySheet extends StatelessWidget {
   const DbLensHistorySheet({
     super.key,
     required this.controller,
     required this.sourceName,
+    this.table,
     this.theme,
   });
 
   final DbLensHistoryController controller;
   final String sourceName;
+  final String? table;
   final DbLensTheme? theme;
 
   static Future<void> show(
     BuildContext context, {
     required DbLensHistoryController controller,
     required String sourceName,
+    String? table,
     DbLensTheme? theme,
   }) {
     return showModalBottomSheet<void>(
@@ -33,6 +35,7 @@ class DbLensHistorySheet extends StatelessWidget {
       builder: (context) => DbLensHistorySheet(
         controller: controller,
         sourceName: sourceName,
+        table: table,
         theme: theme,
       ),
     );
@@ -60,8 +63,13 @@ class DbLensHistorySheet extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             _buildHandle(t),
+            DbLensHistoryHeader(
+              controller: controller,
+              sourceName: sourceName,
+              theme: t,
+            ),
             Flexible(
-              child: DbLensHistoryPanel(controller: controller, sourceName: sourceName),
+              child: DbLensHistoryPanel(controller: controller, table: table),
             ),
           ],
         ),

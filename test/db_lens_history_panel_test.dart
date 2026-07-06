@@ -30,7 +30,6 @@ void main() {
               theme: DbLensTheme(),
               child: DbLensHistoryPanel(
                 controller: historyController,
-                sourceName: 'Demo',
               ),
             ),
           ),

@@ -110,8 +110,7 @@ class DbLens {
     );
   }
 
-  /// Buat controller untuk riwayat perubahan data satu source (dipakai
-  /// lewat [DbLensHistoryPanel]/[DbLensHistorySheet]).
+  /// Create a history controller for [DbLensHistoryPanel] / [DbLensHistorySheet].
   static DbLensHistoryController createHistoryController() {
     return DbLensHistoryController(
       historyRepository: _historyRepository,
@@ -121,8 +120,7 @@ class DbLens {
     );
   }
 
-  /// Konfigurasi pelacakan riwayat perubahan data. Tidak berjalan di release
-  /// build ([kReleaseMode]).
+  /// Configure change-history tracking. No-op in release builds.
   static void configureHistory({bool? enabled, Duration? pollInterval}) {
     if (kReleaseMode) return;
     _registry.configureHistory(enabled: enabled, pollInterval: pollInterval);

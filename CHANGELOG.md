@@ -1,3 +1,11 @@
+## 1.0.1
+
+* **Change history**: `DbLensHistoryHeader` split from `DbLensHistoryPanel` — optional `onBack` for full-page routes, search/filter toggle buttons in header (collapsed by default).
+* `DbLensHistoryPanel` adds optional `table` param to scope entries to one collection.
+* `DbLensHistoryEntryView` — insert/delete use single-column colored diff; copy JSON button; update keeps side-by-side diff.
+* `DbLensHistoryController` — filter by table and change type (`insert` / `update` / `delete`).
+* `DbLensHistorySheet.show()` accepts optional `table`.
+
 ## 1.0.0
 
 Major architecture refactor: `db_lens` from "ready-to-use UI" to "Database Inspector Framework" — usable out of the box (`DbLens.open()`) or composed from small widgets and controllers. Intentional breaking change (pre-1.0, no effort to maintain backward compatibility with 0.0.6).

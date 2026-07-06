@@ -1,4 +1,4 @@
-/// Jenis perubahan data yang terdeteksi oleh history tracker.
+/// Change type detected by the history tracker.
 enum HistoryChangeType {
   insert,
   update,
@@ -12,7 +12,7 @@ enum HistoryChangeType {
   }
 }
 
-/// Satu entri riwayat perubahan baris di collection.
+/// One persisted row-change history entry.
 class HistoryEntry {
   const HistoryEntry({
     this.id,

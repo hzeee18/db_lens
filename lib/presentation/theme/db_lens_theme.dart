@@ -21,6 +21,9 @@ class DbLensTheme {
   Color get syntaxNumber => data.syntaxNumber;
   Color get syntaxBool => data.syntaxBool;
   Color get syntaxDefault => data.syntaxDefault;
+  Color get diffAdded => data.diffAdded;
+  Color get diffRemoved => data.diffRemoved;
+  Color get diffChanged => data.diffChanged;
 
   static const headerFontSize = 11.0;
   static const dataFontSize = 12.5;

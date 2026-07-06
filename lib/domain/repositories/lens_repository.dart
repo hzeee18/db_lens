@@ -21,6 +21,9 @@ abstract class LensRepository {
   /// Nama kolom untuk koleksi (kosong jika tidak didukung).
   Future<List<String>> getColumns(String sourceId, String collection);
 
+  /// SELECT arbitrer tanpa pagination (hanya sumber yang mendukung SQL).
+  Future<List<Map<String, dynamic>>> runRawQuery(String sourceId, String sql);
+
   /// SELECT arbitrer dengan pagination (hanya sumber yang mendukung SQL).
   Future<List<Map<String, dynamic>>> runRawQueryPaged(
     String sourceId,

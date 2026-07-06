@@ -6,59 +6,103 @@ import 'package:flutter/services.dart';
 import '../../core/models/db_lens_config.dart';
 import '../../db_lens_facade.dart';
 import '../controllers/db_lens_controller.dart';
+import '../hooks/db_lens_cell_editor_builder.dart';
+import '../scope/db_lens_controller_scope.dart';
+import '../state/db_lens_pagination.dart';
 import '../theme/db_lens_theme.dart';
-import '../utils/json_view_utils.dart';
-import '../utils/row_utils.dart';
+import '../utils/db_lens_row_id_utils.dart';
+import '../utils/db_lens_snackbar.dart';
+import '../widgets/db_lens_cell_editor.dart';
+import '../widgets/db_lens_chip.dart';
+import '../widgets/db_lens_collection_list.dart';
+import '../widgets/db_lens_empty_state.dart';
+import '../widgets/db_lens_history_sheet.dart';
+import '../widgets/db_lens_json_view.dart';
+import '../widgets/db_lens_list_view.dart';
+import '../widgets/db_lens_loading_view.dart';
+import '../widgets/db_lens_pagination_bar.dart';
 import '../widgets/db_lens_panel_widgets.dart';
+import '../widgets/db_lens_query_editor.dart';
 import '../widgets/db_lens_row_json_sheet.dart';
+import '../widgets/db_lens_search_bar.dart';
+import '../widgets/db_lens_source_list.dart';
+import '../widgets/db_lens_table_view.dart';
+import '../widgets/db_lens_toolbar.dart';
 
-/// Panel inspeksi database — hanya berinteraksi dengan [DbLensController].
-class DbLensPanel extends StatefulWidget {
-  const DbLensPanel({super.key, this.config = const DbLensConfig()});
+enum _DbLensDataView { table, list, json }
+
+/// Panel inspeksi database bawaan — disusun dari widget-widget publik yang
+/// sama yang tersedia untuk custom UI (lihat [DbLensSourceList],
+/// [DbLensToolbar], [DbLensTableView], dst.). Bukan implementasi paralel.
+class DbLensPanel extends StatelessWidget {
+  const DbLensPanel({
+    super.key,
+    this.config = const DbLensConfig(),
+    this.controller,
+  });
 
   final DbLensConfig config;
 
+  /// Jika diisi, panel memakai controller ini dan TIDAK men-dispose-nya.
+  /// Caller harus memanggil [DbLensController.initialize] sebelum widget
+  /// dipasang. Jika null, panel membuat dan mengelola controller sendiri.
+  final DbLensController? controller;
+
   @override
-  State<DbLensPanel> createState() => _DbLensPanelState();
+  Widget build(BuildContext context) {
+    return DbLensControllerScope(
+      controller: controller,
+      config: config,
+      child: const _DbLensPanelSheet(),
+    );
+  }
 }
 
-class _DbLensPanelState extends State<DbLensPanel> {
-  late final DbLensController _controller;
+class _DbLensPanelSheet extends StatefulWidget {
+  const _DbLensPanelSheet();
+
+  @override
+  State<_DbLensPanelSheet> createState() => _DbLensPanelSheetState();
+}
+
+class _DbLensPanelSheetState extends State<_DbLensPanelSheet> {
   bool _isClosing = false;
-  bool _isJsonView = false;
+  _DbLensDataView _dataView = _DbLensDataView.table;
+  DbLensController? _listenedController;
 
   final DraggableScrollableController _sheetController =
       DraggableScrollableController();
   final TextEditingController _searchController = TextEditingController();
-  final TextEditingController _queryController = TextEditingController();
 
   DbLensTheme get _theme => DbLensThemeScope.of(context);
 
   @override
-  void initState() {
-    super.initState();
-    _controller = DbLens.createController(config: widget.config);
-    _controller.addListener(_onControllerChanged);
-    _controller.initialize();
-  }
-
-  void _onControllerChanged() {
-    if (!mounted) return;
-    if (_controller.lastError != null) {
-      _showSnackBar(_controller.lastError!, isError: true);
-      _controller.lastError = null;
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final c = DbLensControllerScope.of(context);
+    if (!identical(_listenedController, c)) {
+      _listenedController?.removeListener(_onControllerChanged);
+      c.addListener(_onControllerChanged);
+      _listenedController = c;
     }
-    setState(() {});
   }
 
   @override
   void dispose() {
-    _controller.removeListener(_onControllerChanged);
-    _controller.dispose();
+    _listenedController?.removeListener(_onControllerChanged);
     _sheetController.dispose();
     _searchController.dispose();
-    _queryController.dispose();
     super.dispose();
+  }
+
+  void _onControllerChanged() {
+    if (!mounted) return;
+    final c = _listenedController;
+    if (c != null && c.lastError != null) {
+      _showSnackBar(c.lastError!, isError: true);
+      c.lastError = null;
+    }
+    setState(() {});
   }
 
   Future<void> _closePanel() async {
@@ -74,107 +118,79 @@ class _DbLensPanelState extends State<DbLensPanel> {
   }
 
   void _showSnackBar(String message, {bool isError = false}) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            Icon(
-              isError ? Icons.error_outline : Icons.check_circle_outline,
-              color: isError ? Colors.redAccent : _theme.accent,
-              size: 18,
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                message,
-                style: TextStyle(color: _theme.textPrimary),
-              ),
-            ),
-          ],
-        ),
-        duration: const Duration(seconds: 2),
-        behavior: SnackBarBehavior.floating,
-        backgroundColor: _theme.bg,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-          side: BorderSide(color: _theme.border),
-        ),
-      ),
-    );
+    showDbLensSnack(context, message, isError: isError);
   }
 
-  Future<void> _confirmAndRunQuery() async {
-    final sql = _queryController.text.trim();
-    _controller.setQueryText(sql);
-    if (sql.isNotEmpty && await _controller.shouldConfirmQuery()) {
-      FocusManager.instance.primaryFocus?.unfocus();
-      if (!mounted) return;
-      final confirmed = await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Confirm query'),
-          content: const Text(
-            '⚠️ This query may modify or delete data. Are you sure?',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('Run'),
-            ),
-          ],
-        ),
-      );
-      if (confirmed != true) return;
-    }
-    await _controller.runQuery();
-  }
-
-  void _toggleJsonView() {
-    setState(() => _isJsonView = !_isJsonView);
-  }
-
-  Future<void> _copyAllAsJson() async {
-    final json = await _controller.copyAllAsJson();
-    if (!mounted || json == null) return;
-    await Clipboard.setData(ClipboardData(text: json));
-    _showSnackBar('Copied all rows as JSON');
-  }
+  void _setDataView(_DbLensDataView view) => setState(() => _dataView = view);
 
   Future<void> _showEditCellDialog({
     required String column,
     required Object? currentValue,
     required Map<String, Object?> row,
   }) async {
-    if (!_controller.canEditCells) return;
+    final c = DbLensControllerScope.of(context);
+    if (!c.canEditCells) return;
 
-    final result = await showDialog<Object?>(
-      context: context,
-      builder: (context) => _EditCellDialog(
-        column: column,
-        currentValue: currentValue,
-        theme: _theme,
-      ),
-    );
-
-    if (!mounted || result == _EditCellDialog.cancelled) return;
-
-    final success = await _controller.updateCellValue(
-      column: column,
-      newValue: result,
-      row: row,
-    );
-    if (success && mounted) {
-      _showSnackBar('Cell updated');
+    Object? result;
+    try {
+      result = await DbLensCellEditor.show(context, column, currentValue);
+    } on DbLensCellEditCancelled {
+      return;
     }
+
+    if (!mounted) return;
+    final success = await c.updateCellValue(column: column, newValue: result, row: row);
+    if (success && mounted) _showSnackBar('Cell updated');
   }
+
+  void _showRowJsonView(Map<String, Object?> row, {int? rowNum}) {
+    final c = DbLensControllerScope.of(context);
+    DbLensRowJsonSheet.show(
+      context,
+      row: row,
+      theme: _theme,
+      rowNum: rowNum,
+      canEdit: c.canEditCells,
+      onCopied: () => _showSnackBar('Copied as JSON'),
+      onSave: (updated) => c.updateRowFromJson(row, updated),
+      onSaved: () => _showSnackBar('Row updated'),
+    );
+  }
+
+  void _copyRow(Map<String, Object?> row) {
+    final exportRow = Map<String, Object?>.from(
+      withoutRowIdEntry(Map<String, dynamic>.from(row)),
+    );
+    Clipboard.setData(ClipboardData(text: jsonEncode(exportRow)));
+    _showSnackBar('Copied as JSON');
+  }
+
+  Future<void> _showHistorySheet(DbLensController c) async {
+    final sourceId = c.source.selectedSourceId;
+    if (sourceId == null) return;
+
+    final historyController = DbLens.createHistoryController();
+    await historyController.loadFor(sourceId);
+    if (!mounted) {
+      historyController.dispose();
+      return;
+    }
+
+    await DbLensHistorySheet.show(
+      context,
+      controller: historyController,
+      sourceName: c.source.selectedSourceName ?? sourceId,
+      theme: _theme,
+    );
+    historyController.dispose();
+  }
+
+  DbLensPaginationController<Map<String, Object?>>? _activePagination(DbLensController c) =>
+      c.query.queryMode ? c.query.pagination : c.table.pagination;
 
   @override
   Widget build(BuildContext context) {
-    final c = _controller;
+    final c = DbLensControllerScope.of(context);
 
     return PopScope(
       canPop: false,
@@ -187,35 +203,25 @@ class _DbLensPanelState extends State<DbLensPanel> {
         minChildSize: DbLensTheme.minChildSize,
         maxChildSize: DbLensTheme.maxChildSize,
         builder: (context, scrollController) {
-          // final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
           return AnimatedBuilder(
             animation: _sheetController,
             builder: (context, _) {
-              final sheetSize = _sheetController.isAttached
-                  ? _sheetController.size
-                  : DbLensTheme.initialChildSize;
+              final sheetSize =
+                  _sheetController.isAttached ? _sheetController.size : DbLensTheme.initialChildSize;
               return DbLensUnfocusTap(
-                onTapOutside: () =>
-                    FocusManager.instance.primaryFocus?.unfocus(),
+                onTapOutside: () => FocusManager.instance.primaryFocus?.unfocus(),
                 child: DecoratedBox(
                   decoration: _theme.sheetDecoration(size: sheetSize),
-                  child: Container(
-                    // padding: EdgeInsets.only(bottom: bottomInset),
-                    child: CustomScrollView(
-                      controller: scrollController,
-                      keyboardDismissBehavior:
-                          ScrollViewKeyboardDismissBehavior.onDrag,
-                      slivers: [
-                        SliverToBoxAdapter(child: _buildTopSection(c)),
-                        if (!c.hasSources)
-                          SliverFillRemaining(
-                            hasScrollBody: false,
-                            child: _buildEmptyState(),
-                          )
-                        else
-                          ..._buildDataSlivers(c),
-                      ],
-                    ),
+                  child: CustomScrollView(
+                    controller: scrollController,
+                    keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                    slivers: [
+                      SliverToBoxAdapter(child: _buildTopSection(c)),
+                      if (!c.source.hasSources)
+                        SliverFillRemaining(hasScrollBody: false, child: _buildEmptyState())
+                      else
+                        ..._buildDataSlivers(c),
+                    ],
                   ),
                 ),
               );
@@ -245,7 +251,7 @@ class _DbLensPanelState extends State<DbLensPanel> {
             theme: _theme,
           ),
           _buildHeader(c),
-          if (c.hasSources) ...[
+          if (c.source.hasSources) ...[
             Divider(height: 1, thickness: 1, color: _theme.border),
             _buildSelectorSection(c),
           ],
@@ -269,9 +275,7 @@ class _DbLensPanelState extends State<DbLensPanel> {
               backgroundColor: _theme.accentSoft,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(7),
-                side: BorderSide(
-                  color: _theme.accent.withValues(alpha: 0.25),
-                ),
+                side: BorderSide(color: _theme.accent.withValues(alpha: 0.25)),
               ),
             ),
             icon: Icon(Icons.close_rounded, size: 15, color: _theme.accent),
@@ -293,38 +297,37 @@ class _DbLensPanelState extends State<DbLensPanel> {
                 ),
                 Text(
                   'Database inspector',
-                  style: TextStyle(
-                    color: _theme.textMuted,
-                    fontSize: 11,
-                    height: 1.2,
-                  ),
+                  style: TextStyle(color: _theme.textMuted, fontSize: 11, height: 1.2),
                 ),
               ],
             ),
           ),
-          if (c.selectedCollection != null || c.queryMode)
-            _buildRowCountBadge(c),
+          if (c.source.selectedSourceId != null)
+            IconButton(
+              tooltip: 'History',
+              visualDensity: VisualDensity.compact,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+              onPressed: () => _showHistorySheet(c),
+              style: IconButton.styleFrom(
+                backgroundColor: _theme.accentSoft,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(7),
+                  side: BorderSide(color: _theme.accent.withValues(alpha: 0.25)),
+                ),
+              ),
+              icon: Icon(Icons.history, size: 15, color: _theme.accent),
+            ),
+          if (c.source.selectedSourceId != null) const SizedBox(width: 6),
+          if (c.source.selectedCollection != null || c.query.queryMode)
+            DbLensChip(
+              label: '${c.activeRowCount} rows',
+              foreground: _theme.textSecondary,
+              background: _theme.surface,
+              borderColor: _theme.border,
+              borderRadius: 6,
+            ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildRowCountBadge(DbLensController c) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: _theme.surface,
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: _theme.border),
-      ),
-      child: Text(
-        '${c.activeRowCount} rows',
-        style: TextStyle(
-          color: _theme.textSecondary,
-          fontSize: 11,
-          fontWeight: FontWeight.w500,
-          letterSpacing: -0.2,
-        ),
       ),
     );
   }
@@ -335,216 +338,28 @@ class _DbLensPanelState extends State<DbLensPanel> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          DbLensSelectorField(
-            icon: Icons.dns_outlined,
-            label: 'Source',
-            items: c.filteredSourceNames,
-            selected: c.selectedSourceName,
-            searchText: c.sourceSearchText,
-            onSearchChanged: _controller.setSourceSearchText,
-            searchHint: 'Search sources…',
-            theme: _theme,
-            onSelected: (name) {
-              final source = c.sources.firstWhere((s) => s.name == name);
-              _controller.selectSource(source.id);
-            },
-          ),
-          if (c.collections.isNotEmpty) ...[
+          const DbLensSourceList(),
+          if (c.source.collections.isNotEmpty) ...[
             const SizedBox(height: 10),
-            DbLensSelectorField(
-              icon: Icons.table_rows_outlined,
-              label: 'Collection',
-              items: c.filteredCollections,
-              selected: c.selectedCollection,
-              searchText: c.collectionSearchText,
-              onSearchChanged: _controller.setCollectionSearchText,
-              searchHint: 'Search collections…',
-              theme: _theme,
-              onSelected: _controller.selectCollection,
-            ),
+            const DbLensCollectionList(),
           ],
-          if (c.selectedSourceId != null && c.supportsRawSql) ...[
+          if (c.source.selectedSourceId != null && c.source.supportsRawSql) ...[
             const SizedBox(height: 10),
-            _buildQuerySection(c),
+            const DbLensQueryEditor(),
           ],
-          if (c.selectedSourceId != null &&
-              (c.selectedCollection != null || c.queryMode)) ...[
+          if (c.source.selectedSourceId != null &&
+              (c.source.selectedCollection != null || c.query.queryMode)) ...[
             const SizedBox(height: 12),
-            _buildSearchField(c),
+            DbLensSearchBar(
+              controller: _searchController,
+              hintText: 'Search rows across all columns',
+              onChanged: c.table.setSearchText,
+              onClear: c.table.clearSearch,
+              showClear: c.table.searchText.isNotEmpty,
+              padding: EdgeInsets.zero,
+            ),
           ],
         ],
-      ),
-    );
-  }
-
-  Widget _buildSearchField(DbLensController c) {
-    return TextField(
-      controller: _searchController,
-      onChanged: _controller.setSearchText,
-      enabled: c.activeRows.isNotEmpty || c.queryMode,
-      decoration: _theme.fieldDecoration(
-        hintText: 'Search rows across all columns',
-        prefixIcon: const Icon(Icons.search, size: 18),
-        suffixIcon: c.searchText.isEmpty
-            ? null
-            : IconButton(
-                tooltip: 'Clear search',
-                onPressed: () {
-                  _searchController.clear();
-                  _controller.clearSearch();
-                },
-                icon: const Icon(Icons.close, size: 18),
-              ),
-      ),
-    );
-  }
-
-  Widget _buildQuerySection(DbLensController c) {
-    final canClear = c.queryMode || _queryController.text.trim().isNotEmpty;
-
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: _theme.surface,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: _theme.border),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(10),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.code_rounded, size: 16, color: _theme.textMuted),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Raw SQL Query',
-                    style: TextStyle(
-                      color: _theme.textPrimary,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-                TextButton(
-                  onPressed: _controller.toggleQueryExpanded,
-                  child: Text(c.queryExpanded ? 'Collapse' : 'Expand'),
-                ),
-              ],
-            ),
-            if (c.queryExpanded || canClear) ...[
-              const SizedBox(height: 8),
-              TextField(
-                controller: _queryController,
-                minLines: 2,
-                maxLines: 6,
-                onChanged: (_) => setState(() {}),
-                decoration: _theme
-                    .fieldDecoration(
-                      hintText: 'SELECT * FROM users LIMIT 20',
-                      fillColor: _theme.bg,
-                    )
-                    .copyWith(contentPadding: const EdgeInsets.all(12)),
-                style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
-              ),
-              const SizedBox(height: 8),
-              Wrap(
-                alignment: WrapAlignment.spaceBetween,
-                runSpacing: 8,
-                spacing: 8,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  Text(
-                    'SELECT runs directly. Non-SELECT queries require confirmation.',
-                    style: TextStyle(color: _theme.textMuted, fontSize: 11),
-                  ),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (canClear)
-                        TextButton(
-                          onPressed: c.runningQuery
-                              ? null
-                              : () {
-                                  if (c.queryMode) {
-                                    _controller.restoreTableView();
-                                    return;
-                                  }
-                                  _queryController.clear();
-                                  _controller.clearQueryInput();
-                                },
-                          child: const Text('Clear query'),
-                        ),
-                      const SizedBox(width: 8),
-                      FilledButton.icon(
-                        onPressed: c.runningQuery ? null : _confirmAndRunQuery,
-                        icon: c.runningQuery
-                            ? const SizedBox(
-                                width: 14,
-                                height: 14,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              )
-                            : const Icon(Icons.play_arrow_rounded, size: 18),
-                        label: Text(c.runningQuery ? 'Running' : 'Run'),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-              if (c.queryError != null)
-                _buildQueryMessage(
-                  c.queryError!,
-                  icon: Icons.error_outline,
-                  color: Colors.redAccent,
-                )
-              else if (c.queryInfoMessage != null)
-                _buildQueryMessage(
-                  c.queryInfoMessage!,
-                  icon: Icons.info_outline,
-                  color: _theme.accent,
-                ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildQueryMessage(
-    String message, {
-    required IconData icon,
-    required Color color,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 8),
-      child: Container(
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(
-          color: _theme.bg,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: _theme.border),
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(icon, size: 16, color: color),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                message,
-                style: TextStyle(
-                  color: _theme.textSecondary,
-                  fontSize: 12,
-                  height: 1.35,
-                ),
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -553,25 +368,22 @@ class _DbLensPanelState extends State<DbLensPanel> {
     final columns = c.activeColumns;
     final visibleRows = c.visibleRows(columns: columns);
 
-    if (c.loading) {
+    if (c.table.loading) {
       return [
         SliverFillRemaining(
           hasScrollBody: false,
-          child: ColoredBox(
-            color: _theme.bg,
-            child: DbLensLoadingIndicator(theme: _theme),
-          ),
+          child: ColoredBox(color: _theme.bg, child: DbLensLoadingView(theme: _theme)),
         ),
       ];
     }
 
-    if (c.selectedCollection == null && !c.queryMode) {
+    if (c.source.selectedCollection == null && !c.query.queryMode) {
       return [
         SliverFillRemaining(
           hasScrollBody: false,
           child: ColoredBox(
             color: _theme.bg,
-            child: DbLensEmptyPlaceholder(
+            child: DbLensEmptyState(
               icon: Icons.table_chart_outlined,
               title: 'Select a collection',
               subtitle: 'Pick a source and collection above to inspect rows',
@@ -588,16 +400,14 @@ class _DbLensPanelState extends State<DbLensPanel> {
           hasScrollBody: false,
           child: ColoredBox(
             color: _theme.bg,
-            child: DbLensEmptyPlaceholder(
-              icon: c.queryMode
-                  ? Icons.search_off_outlined
-                  : Icons.inbox_outlined,
-              title: c.queryMode
-                  ? (c.queryInfoMessage ?? 'No rows returned')
+            child: DbLensEmptyState(
+              icon: c.query.queryMode ? Icons.search_off_outlined : Icons.inbox_outlined,
+              title: c.query.queryMode
+                  ? (c.query.queryInfoMessage ?? 'No rows returned')
                   : 'Collection is empty',
-              subtitle: c.queryMode
+              subtitle: c.query.queryMode
                   ? 'Run another query or clear query to return to the table view'
-                  : 'No rows found in "${c.selectedCollection}"',
+                  : 'No rows found in "${c.source.selectedCollection}"',
               theme: _theme,
             ),
           ),
@@ -605,15 +415,15 @@ class _DbLensPanelState extends State<DbLensPanel> {
       ];
     }
 
-    if (visibleRows.isEmpty && c.hasActiveSearch) {
+    if (visibleRows.isEmpty && c.table.hasActiveSearch) {
       return [
         SliverFillRemaining(
           hasScrollBody: false,
           child: ColoredBox(
             color: _theme.bg,
-            child: DbLensEmptyPlaceholder(
+            child: DbLensEmptyState(
               icon: Icons.search_off_outlined,
-              title: 'No results for "${c.searchText.trim()}"',
+              title: 'No results for "${c.table.searchText.trim()}"',
               subtitle: 'Try a different keyword or clear the search field',
               theme: _theme,
             ),
@@ -623,39 +433,66 @@ class _DbLensPanelState extends State<DbLensPanel> {
     }
 
     return [
-      if (c.queryMode && c.queryCustomResult)
-        SliverToBoxAdapter(child: _buildCustomQueryBanner(c)),
+      if (c.query.queryMode && c.query.queryCustomResult)
+        SliverToBoxAdapter(child: _buildCustomQueryBanner()),
+      SliverToBoxAdapter(child: _buildToolbar(c, visibleRows.length)),
       SliverToBoxAdapter(
-        child: _buildTableToolbar(c, visibleRows.length),
-      ),
-      SliverToBoxAdapter(
-        child: ColoredBox(
-          color: _theme.bg,
-          child: Stack(
-            children: [
-              AnimatedSwitcher(
-                duration: const Duration(milliseconds: 200),
-                child: _isJsonView
-                    ? _buildJsonArrayView(visibleRows)
-                    : SingleChildScrollView(
-                        key: const ValueKey('table-view'),
-                        scrollDirection: Axis.horizontal,
-                        primary: false,
-                        child: _buildDataTable(c, visibleRows, columns),
+        child: SizedBox(
+          height: 420,
+          child: ColoredBox(
+            color: _theme.bg,
+            child: Stack(
+              children: [
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 200),
+                  child: switch (_dataView) {
+                    _DbLensDataView.json =>
+                      DbLensJsonView(key: const ValueKey('json-view'), rows: visibleRows),
+                    _DbLensDataView.list => DbLensListView(
+                        key: const ValueKey('list-view'),
+                        rows: visibleRows,
+                        columns: columns,
+                        rowNumberStart: (c.table.pagination?.rangeStart ?? 1),
+                        canEditColumn: (col) => c.canEditCells && col != kDbLensRowIdColumn,
+                        onEditCell: (col, value, row) =>
+                            _showEditCellDialog(column: col, currentValue: value, row: row),
+                        onCopyRow: _copyRow,
                       ),
-              ),
-              if (c.isPageTransition)
-                Positioned.fill(
-                  child: DbLensTablePageSkeleton(theme: _theme),
+                    _DbLensDataView.table => DbLensTableView(
+                        key: const ValueKey('table-view'),
+                        rows: visibleRows,
+                        columns: columns,
+                        rowNumberStart: (c.table.pagination?.rangeStart ?? 1),
+                        sortColumn: c.table.sortColumn,
+                        sortAscending: c.table.sortAscending,
+                        onSort: c.table.toggleSort,
+                        onRowTap: (row) => _showRowJsonView(row),
+                        onIndexLongPress: _copyRow,
+                        onCellLongPress: (col, row) {
+                          if (c.canEditCells && col != kDbLensRowIdColumn) {
+                            _showEditCellDialog(
+                              column: col,
+                              currentValue: row[col],
+                              row: row,
+                            );
+                          } else {
+                            _copyRow(row);
+                          }
+                        },
+                      ),
+                  },
                 ),
-              if (c.copyingJson)
-                Positioned.fill(
-                  child: ColoredBox(
-                    color: _theme.bg.withValues(alpha: 0.7),
-                    child: DbLensLoadingIndicator(theme: _theme),
+                if (_isPageTransition(c))
+                  Positioned.fill(child: DbLensTablePageSkeleton(theme: _theme)),
+                if (c.copyingJson)
+                  Positioned.fill(
+                    child: ColoredBox(
+                      color: _theme.bg.withValues(alpha: 0.7),
+                      child: DbLensLoadingView(theme: _theme),
+                    ),
                   ),
-                ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -663,317 +500,85 @@ class _DbLensPanelState extends State<DbLensPanel> {
     ];
   }
 
-  Widget _buildJsonArrayView(List<Map<String, Object?>> rows) {
+  bool _isPageTransition(DbLensController c) {
+    final pagination = _activePagination(c);
+    return pagination != null && pagination.isLoading && !pagination.isInitialLoad;
+  }
+
+  Widget _buildCustomQueryBanner() {
     return Padding(
-      key: const ValueKey('json-view'),
-      padding: const EdgeInsets.all(16),
-      child: SelectableText(
-        JsonViewUtils.encodePrettyArray(rows),
-        style: TextStyle(
-          fontSize: DbLensTheme.dataFontSize,
-          height: 1.5,
-          color: _theme.textPrimary,
-          overflow: TextOverflow.clip,
-        ),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      child: DbLensChip(
+        icon: Icons.query_stats,
+        label: 'Custom query result — collection not switched',
+        foreground: _theme.accent,
+        background: _theme.accentSoft,
+        borderColor: _theme.accent.withValues(alpha: 0.25),
+        borderRadius: 8,
+        expandWidth: true,
       ),
     );
   }
 
-  Widget _buildCustomQueryBanner(DbLensController c) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      color: _theme.accentSoft,
-      child: Row(
-        children: [
-          Icon(Icons.query_stats, size: 14, color: _theme.accent),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              'Custom query result — collection not switched',
-              style: TextStyle(color: _theme.accent, fontSize: 11),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTableToolbar(
-    DbLensController c,
-    int visibleCount,
-  ) {
-    final pagination = c.pagination;
-    final statusText = c.queryMode
+  Widget _buildToolbar(DbLensController c, int visibleCount) {
+    final pagination = _activePagination(c);
+    final statusText = c.query.queryMode
         ? '$visibleCount of ${c.activeRowCount}'
         : pagination != null && pagination.totalRows > 0
             ? '${pagination.rangeStart}–${pagination.rangeEnd} of ${pagination.totalRows}'
             : '0 rows';
 
-    final hintText = _isJsonView
-        ? 'Current page as JSON · copy button copies all rows'
-        : c.canEditCells
-            ? 'Tap row to view JSON · long-press cell to edit'
-            : 'Tap row to view JSON · long-press index to copy';
+    final hintText = switch (_dataView) {
+      _DbLensDataView.json => 'Current page as JSON · copy button copies all rows',
+      _DbLensDataView.list => c.canEditCells
+          ? 'Tap card to view JSON · long-press a field to edit'
+          : 'Tap card to view JSON · long-press card to copy',
+      _DbLensDataView.table => c.canEditCells
+          ? 'Tap row to view JSON · long-press cell to edit'
+          : 'Tap row to view JSON · long-press index to copy',
+    };
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        color: _theme.surface,
-        border: Border(bottom: BorderSide(color: _theme.border)),
-      ),
-      child: Row(
+    return DbLensToolbar(
+      status: Row(
         children: [
-          Icon(Icons.info_outline, size: 13, color: _theme.textMuted),
-          const SizedBox(width: 6),
           Expanded(
-            child: Text(
-              hintText,
-              style: TextStyle(color: _theme.textMuted, fontSize: 11),
-            ),
+            child: Text(hintText, style: TextStyle(color: _theme.textMuted, fontSize: 11)),
           ),
-          Text(
-            statusText,
-            style: TextStyle(
-              color: _theme.textSecondary,
-              fontSize: 11,
-            ),
-          ),
-          const SizedBox(width: 4),
-          IconButton(
-            tooltip:
-                _isJsonView ? 'Switch to table view' : 'Switch to JSON view',
-            onPressed: _toggleJsonView,
-            visualDensity: VisualDensity.compact,
-            icon: Icon(
-              _isJsonView
-                  ? Icons.table_rows_outlined
-                  : Icons.data_object_outlined,
-              size: 18,
-              color: _theme.accent,
-            ),
-          ),
-          IconButton(
-            tooltip: 'Copy all as JSON',
-            onPressed: c.canCopyJson && !c.copyingJson ? _copyAllAsJson : null,
-            visualDensity: VisualDensity.compact,
-            icon: c.copyingJson
-                ? SizedBox(
-                    width: 14,
-                    height: 14,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: _theme.accent,
-                    ),
-                  )
-                : Icon(Icons.content_copy, size: 18, color: _theme.accent),
-          ),
-          IconButton(
-            tooltip: 'Refresh',
-            onPressed: c.canRefresh ? _controller.refresh : null,
-            visualDensity: VisualDensity.compact,
-            icon: c.refreshing
-                ? SizedBox(
-                    width: 14,
-                    height: 14,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: _theme.accent,
-                    ),
-                  )
-                : const Icon(Icons.refresh_rounded, size: 18),
-          ),
+          Text(statusText, style: TextStyle(color: _theme.textSecondary, fontSize: 11)),
         ],
       ),
-    );
-  }
-
-  Widget _buildDataTable(
-    DbLensController c,
-    List<Map<String, Object?>> rows,
-    List<String> columns,
-  ) {
-    return Table(
-      defaultColumnWidth: const IntrinsicColumnWidth(),
-      border: TableBorder(
-        horizontalInside: BorderSide(color: _theme.border),
-        verticalInside: BorderSide(color: _theme.border),
-      ),
-      children: [
-        TableRow(
-          decoration: BoxDecoration(color: _theme.surface),
-          children: [
-            _buildIndexHeaderCell(),
-            ...columns.map((col) => _buildHeaderCell(c, col)),
-          ],
-        ),
-        ...rows.asMap().entries.map((entry) {
-          final index = entry.key;
-          final row = entry.value;
-          final rowNum = (c.pagination?.rangeStart ?? 1) + index;
-          return TableRow(
-            decoration: BoxDecoration(
-              color: index.isEven ? _theme.bg : _theme.surface,
-            ),
-            children: [
-              _buildIndexCell(rowNum, row),
-              ...columns.map((col) {
-                final value = row[col];
-                final formatted = RowUtils.formatValue(value);
-                final display = formatted.length > 48
-                    ? '${formatted.substring(0, 48)}…'
-                    : formatted;
-                return _buildDataCell(
-                  display: display,
-                  value: value,
-                  column: col,
-                  row: row,
-                  rowNum: rowNum,
-                  editable: c.canEditCells && col != '_rowid_',
-                );
-              }),
-            ],
-          );
-        }),
+      actions: [
+        for (final view in _DbLensDataView.values) _buildViewToggleButton(view),
+        DbLensCopyJsonAction(onCopied: (_) => _showSnackBar('Copied all rows as JSON')),
+        const DbLensRefreshAction(),
       ],
     );
   }
 
-  Widget _buildIndexHeaderCell() {
-    return SizedBox(
-      width: DbLensTheme.indexColWidth,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: 10,
-          vertical: DbLensTheme.cellPaddingV,
-        ),
-        child: Text(
-          '#',
-          style: TextStyle(
-            color: _theme.textMuted.withValues(alpha: 0.9),
-            fontSize: DbLensTheme.headerFontSize,
-            fontWeight: FontWeight.w600,
-            letterSpacing: 0.3,
-          ),
-        ),
-      ),
+  Widget _buildViewToggleButton(_DbLensDataView view) {
+    final icon = switch (view) {
+      _DbLensDataView.table => Icons.table_rows_outlined,
+      _DbLensDataView.list => Icons.view_agenda_outlined,
+      _DbLensDataView.json => Icons.data_object_outlined,
+    };
+    final tooltip = switch (view) {
+      _DbLensDataView.table => 'Table view',
+      _DbLensDataView.list => 'List view',
+      _DbLensDataView.json => 'JSON view',
+    };
+    final isActive = _dataView == view;
+    return IconButton(
+      tooltip: tooltip,
+      onPressed: () => _setDataView(view),
+      visualDensity: VisualDensity.compact,
+      icon: Icon(icon, size: 18, color: isActive ? _theme.accent : _theme.textMuted),
     );
-  }
-
-  Widget _buildHeaderCell(DbLensController c, String label) {
-    final isActive = c.sortColumn == label;
-    final indicator = !isActive ? '' : (c.sortAscending ? ' ↑' : ' ↓');
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: DbLensTheme.cellPaddingH,
-        vertical: DbLensTheme.cellPaddingV,
-      ),
-      child: InkWell(
-        onTap: () => _controller.toggleSort(label),
-        borderRadius: BorderRadius.circular(6),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(minWidth: DbLensTheme.cellMinWidth),
-          child: Text(
-            '$label$indicator',
-            style: TextStyle(
-              color: isActive ? _theme.textPrimary : _theme.textSecondary,
-              fontSize: DbLensTheme.headerFontSize,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 0.2,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _showRowJsonView(Map<String, Object?> row, {int? rowNum}) {
-    DbLensRowJsonSheet.show(
-      context,
-      row: row,
-      theme: _theme,
-      rowNum: rowNum,
-      canEdit: _controller.canEditCells,
-      onCopied: () => _showSnackBar('Copied as JSON'),
-      onSave: (updated) => _controller.updateRowFromJson(row, updated),
-      onSaved: () => _showSnackBar('Row updated'),
-    );
-  }
-
-  Widget _buildIndexCell(int rowNum, Map<String, Object?> row) {
-    return GestureDetector(
-      onTap: () => _showRowJsonView(row, rowNum: rowNum),
-      onLongPress: () => _copyRow(row),
-      behavior: HitTestBehavior.opaque,
-      child: SizedBox(
-        width: DbLensTheme.indexColWidth,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: 10,
-            vertical: DbLensTheme.cellPaddingV,
-          ),
-          child: Text(
-            '$rowNum',
-            style: TextStyle(
-              color: _theme.textMuted.withValues(alpha: 0.85),
-              fontSize: DbLensTheme.dataFontSize - 1,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDataCell({
-    required String display,
-    required Object? value,
-    required String column,
-    required Map<String, Object?> row,
-    required int rowNum,
-    required bool editable,
-  }) {
-    final isNull = value == null;
-    return GestureDetector(
-      onTap: () => _showRowJsonView(row, rowNum: rowNum),
-      onLongPress: editable
-          ? () => _showEditCellDialog(
-                column: column,
-                currentValue: value,
-                row: row,
-              )
-          : () => _copyRow(row),
-      behavior: HitTestBehavior.opaque,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: DbLensTheme.cellPaddingH,
-          vertical: DbLensTheme.cellPaddingV,
-        ),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(minWidth: DbLensTheme.cellMinWidth),
-          child: Text(
-            display,
-            style: TextStyle(
-              color: RowUtils.valueColor(value, _theme),
-              fontSize: DbLensTheme.dataFontSize,
-              fontStyle: isNull ? FontStyle.italic : FontStyle.normal,
-              height: 1.35,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _copyRow(Map<String, Object?> row) {
-    final exportRow = Map<String, Object?>.from(row)..remove('_rowid_');
-    Clipboard.setData(ClipboardData(text: jsonEncode(exportRow)));
-    _showSnackBar('Copied as JSON');
   }
 
   Widget _buildEmptyState() {
     return ColoredBox(
       color: _theme.bg,
-      child: DbLensEmptyPlaceholder(
+      child: DbLensEmptyState(
         icon: Icons.storage_outlined,
         title: 'No sources registered',
         subtitle: "Call DbLens.register('Name', db) before opening the panel",
@@ -983,7 +588,7 @@ class _DbLensPanelState extends State<DbLensPanel> {
   }
 
   Widget _buildPagination(DbLensController c) {
-    final pagination = c.pagination;
+    final pagination = _activePagination(c);
 
     if (pagination != null) {
       return DbLensPaginationBar(
@@ -996,9 +601,9 @@ class _DbLensPanelState extends State<DbLensPanel> {
         canGoNext: pagination.canGoNext,
         isLoading: pagination.isLoading,
         theme: _theme,
-        onPrevious: () => pagination.previousPage(),
-        onNext: () => pagination.nextPage(),
-        onJumpToPage: (page) => pagination.jumpToPage(page),
+        onPrevious: pagination.previousPage,
+        onNext: pagination.nextPage,
+        onJumpToPage: pagination.jumpToPage,
       );
     }
 
@@ -1015,97 +620,6 @@ class _DbLensPanelState extends State<DbLensPanel> {
       theme: _theme,
       onPrevious: () {},
       onNext: () {},
-    );
-  }
-}
-
-class _EditCellDialog extends StatefulWidget {
-  const _EditCellDialog({
-    required this.column,
-    required this.currentValue,
-    required this.theme,
-  });
-
-  static const cancelled = Object();
-
-  final String column;
-  final Object? currentValue;
-  final DbLensTheme theme;
-
-  @override
-  State<_EditCellDialog> createState() => _EditCellDialogState();
-}
-
-class _EditCellDialogState extends State<_EditCellDialog> {
-  late final TextEditingController _textController;
-  late bool _boolValue;
-
-  @override
-  void initState() {
-    super.initState();
-    _boolValue =
-        widget.currentValue is bool ? widget.currentValue! as bool : false;
-    _textController = TextEditingController(
-      text: widget.currentValue?.toString() ?? '',
-    );
-  }
-
-  @override
-  void dispose() {
-    _textController.dispose();
-    super.dispose();
-  }
-
-  Object? _parseValue() {
-    final value = widget.currentValue;
-    if (value is bool) return _boolValue;
-    if (value is int) return int.tryParse(_textController.text.trim());
-    if (value is double) return double.tryParse(_textController.text.trim());
-    if (value is num) {
-      final parsed = num.tryParse(_textController.text.trim());
-      return parsed;
-    }
-    if (value == null && _textController.text.trim().toLowerCase() == 'null') {
-      return null;
-    }
-    return _textController.text;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final value = widget.currentValue;
-    final isBool = value is bool;
-
-    return AlertDialog(
-      title: Text('Edit ${widget.column}'),
-      content: isBool
-          ? SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('Value'),
-              value: _boolValue,
-              onChanged: (v) => setState(() => _boolValue = v),
-            )
-          : TextField(
-              controller: _textController,
-              autofocus: true,
-              keyboardType: value is num
-                  ? const TextInputType.numberWithOptions(decimal: true)
-                  : TextInputType.text,
-              decoration: InputDecoration(
-                labelText: 'New value',
-                border: widget.theme.outlineBorder(),
-              ),
-            ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context, _EditCellDialog.cancelled),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.pop(context, _parseValue()),
-          child: const Text('Save'),
-        ),
-      ],
     );
   }
 }

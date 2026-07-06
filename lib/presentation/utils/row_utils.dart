@@ -1,26 +1,8 @@
-import 'package:flutter/material.dart';
-
-import '../theme/db_lens_theme.dart';
-
-/// Utilitas format, warna, pencarian, dan sort baris di UI.
-abstract final class RowUtils {
-  static Color valueColor(Object? value, [DbLensTheme? theme]) {
-    final t = theme ?? DbLensTheme();
-    if (value == null) return t.syntaxNull;
-    if (value is bool) return t.syntaxBool;
-    if (value is num) return t.syntaxNumber;
-    if (value is String || value is List<String>) return t.syntaxString;
-    return t.syntaxDefault;
-  }
-
-  static String formatValue(Object? value) {
-    if (value == null) return 'null';
-    if (value is bool) return value.toString();
-    if (value is String) return '"$value"';
-    if (value is List<String>) return '[${value.map((e) => '"$e"').join(', ')}]';
-    return value.toString();
-  }
-
+/// Utilitas pencarian dan sort baris di UI. Format/warna nilai sel ada di
+/// [DbLensValueFormat] (hooks/db_lens_value_renderer.dart) — dipisah karena
+/// itu bagian dari kontrak ekstensibilitas publik, sementara ini murni
+/// detail implementasi internal search/sort.
+abstract final class DbLensRowUtils {
   static String normalizeValue(Object? value) {
     if (value == null) return 'null';
     if (value is String) return value;

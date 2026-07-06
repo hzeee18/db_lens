@@ -16,6 +16,9 @@ class DbLensThemeData {
     this.syntaxNumber = const Color(0xFFD97706),
     this.syntaxBool = const Color(0xFF2563EB),
     this.syntaxDefault = const Color(0xFF111827),
+    this.diffAdded = const Color(0xFF16A34A),
+    this.diffRemoved = const Color(0xFFDC2626),
+    this.diffChanged = const Color(0xFFD97706),
   });
 
   /// Nilai default — sama dengan token hardcoded asli.
@@ -35,6 +38,15 @@ class DbLensThemeData {
   final Color syntaxBool;
   final Color syntaxDefault;
 
+  /// Warna field yang ditambahkan (insert / hanya ada di "after").
+  final Color diffAdded;
+
+  /// Warna field yang dihapus (delete / hanya ada di "before").
+  final Color diffRemoved;
+
+  /// Warna field yang nilainya berubah (update).
+  final Color diffChanged;
+
   factory DbLensThemeData.fromMaterialTheme(ThemeData theme) {
     final cs = theme.colorScheme;
     return DbLensThemeData(
@@ -51,6 +63,9 @@ class DbLensThemeData {
       syntaxNumber: const Color(0xFFB45309),
       syntaxBool: const Color(0xFF1D4ED8),
       syntaxDefault: const Color(0xFF1C1917),
+      diffAdded: const Color(0xFF15803D),
+      diffRemoved: const Color(0xFFDC2626),
+      diffChanged: const Color(0xFFB45309),
     );
   }
 
@@ -68,6 +83,9 @@ class DbLensThemeData {
     Color? syntaxNumber,
     Color? syntaxBool,
     Color? syntaxDefault,
+    Color? diffAdded,
+    Color? diffRemoved,
+    Color? diffChanged,
   }) {
     return DbLensThemeData(
       bg: bg ?? this.bg,
@@ -83,6 +101,9 @@ class DbLensThemeData {
       syntaxNumber: syntaxNumber ?? this.syntaxNumber,
       syntaxBool: syntaxBool ?? this.syntaxBool,
       syntaxDefault: syntaxDefault ?? this.syntaxDefault,
+      diffAdded: diffAdded ?? this.diffAdded,
+      diffRemoved: diffRemoved ?? this.diffRemoved,
+      diffChanged: diffChanged ?? this.diffChanged,
     );
   }
 }

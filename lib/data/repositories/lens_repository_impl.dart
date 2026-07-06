@@ -70,6 +70,11 @@ class LensRepositoryImpl implements LensRepository {
   }
 
   @override
+  Future<List<Map<String, dynamic>>> runRawQuery(String sourceId, String sql) {
+    return _requireSqlSource(sourceId).rawQuery(sql);
+  }
+
+  @override
   Future<List<Map<String, dynamic>>> runRawQueryPaged(
     String sourceId,
     String sql, {

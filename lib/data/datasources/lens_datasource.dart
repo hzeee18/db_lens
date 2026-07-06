@@ -31,4 +31,8 @@ abstract class LensDataSource {
 
   /// Ambil semua baris (untuk ekspor).
   Future<List<Map<String, dynamic>>> allRows(String collection);
+
+  /// Kolom yang dipakai sebagai identitas baris saat diffing riwayat.
+  /// Default kosong — tracker fallback ke full-row identity.
+  Future<List<String>> identityColumns(String collection) async => [];
 }

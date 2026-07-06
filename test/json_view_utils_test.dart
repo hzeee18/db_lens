@@ -2,9 +2,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:db_lens/presentation/utils/json_view_utils.dart';
 
 void main() {
-  group('JsonViewUtils', () {
+  group('DbLensJsonUtils', () {
     test('prepareRow removes _rowid_', () {
-      final prepared = JsonViewUtils.prepareRow({
+      final prepared = DbLensJsonUtils.prepareRow({
         '_rowid_': 1,
         'name': 'Alice',
       });
@@ -13,12 +13,12 @@ void main() {
     });
 
     test('normalizeValue parses JSON string', () {
-      final result = JsonViewUtils.normalizeValue('{"key":"value"}');
+      final result = DbLensJsonUtils.normalizeValue('{"key":"value"}');
       expect(result, {'key': 'value'});
     });
 
     test('normalizeValue parses nested JSON string', () {
-      final result = JsonViewUtils.normalizeValue(
+      final result = DbLensJsonUtils.normalizeValue(
         '{"nested":"{\\"a\\":1}"}',
       );
       expect(result, {
@@ -27,19 +27,19 @@ void main() {
     });
 
     test('encodePretty produces indented JSON', () {
-      final json = JsonViewUtils.encodePretty({'id': 1, 'name': 'test'});
+      final json = DbLensJsonUtils.encodePretty({'id': 1, 'name': 'test'});
       expect(json, contains('\n'));
       expect(json, contains('"id"'));
     });
 
     test('looksLikeJson rejects plain strings', () {
-      expect(JsonViewUtils.looksLikeJson('hello'), isFalse);
-      expect(JsonViewUtils.looksLikeJson('{"a":1}'), isTrue);
-      expect(JsonViewUtils.looksLikeJson('[1,2]'), isTrue);
+      expect(DbLensJsonUtils.looksLikeJson('hello'), isFalse);
+      expect(DbLensJsonUtils.looksLikeJson('{"a":1}'), isTrue);
+      expect(DbLensJsonUtils.looksLikeJson('[1,2]'), isTrue);
     });
 
     test('encodePrettyArray produces JSON array', () {
-      final json = JsonViewUtils.encodePrettyArray([
+      final json = DbLensJsonUtils.encodePrettyArray([
         {'id': 1, 'name': 'Alice'},
         {'id': 2, 'name': 'Bob'},
       ]);
@@ -49,13 +49,13 @@ void main() {
     });
 
     test('parseRowJson parses object', () {
-      final map = JsonViewUtils.parseRowJson('{"name": "Alice", "age": 30}');
+      final map = DbLensJsonUtils.parseRowJson('{"name": "Alice", "age": 30}');
       expect(map['name'], 'Alice');
       expect(map['age'], 30);
     });
 
     test('parseRowJson rejects non-object', () {
-      expect(() => JsonViewUtils.parseRowJson('[1, 2]'), throwsFormatException);
+      expect(() => DbLensJsonUtils.parseRowJson('[1, 2]'), throwsFormatException);
     });
   });
 }

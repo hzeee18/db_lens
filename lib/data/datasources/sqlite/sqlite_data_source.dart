@@ -103,6 +103,21 @@ class SqliteDataSource implements SqlQueryableDataSource {
     return result.map((row) => Map<String, dynamic>.from(row)).toList();
   }
 
+  Future<List<String>> _pkColumns(String collection) async {
+    final info = await _database.rawQuery('PRAGMA table_info($collection)');
+    return info
+        .where((r) => r['pk'] != null && (r['pk'] as int) > 0)
+        .map((r) => r['name'] as String)
+        .toList();
+  }
+
+  @override
+  Future<List<String>> identityColumns(String collection) async {
+    final pkCols = await _pkColumns(collection);
+    if (pkCols.isNotEmpty) return pkCols;
+    return const ['_rowid_'];
+  }
+
   @override
   Future<void> updateCell(
     String collection,
@@ -114,11 +129,7 @@ class SqliteDataSource implements SqlQueryableDataSource {
       throw UnsupportedError('Cannot edit internal rowid column.');
     }
 
-    final info = await _database.rawQuery('PRAGMA table_info($collection)');
-    final pkCols = info
-        .where((r) => r['pk'] != null && (r['pk'] as int) > 0)
-        .map((r) => r['name'] as String)
-        .toList();
+    final pkCols = await _pkColumns(collection);
 
     late final String where;
     late final List<Object?> whereArgs;
@@ -127,10 +138,21 @@ class SqliteDataSource implements SqlQueryableDataSource {
       where = pkCols.map((c) => '$c = ?').join(' AND ');
       whereArgs = pkCols.map((c) => row[c]).toList();
     } else if (row.containsKey('_rowid_')) {
+      final rowid = row['_rowid_'];
+      if (rowid == null) {
+        throw StateError(
+          'Cannot update row: no primary key and _rowid_ is null',
+        );
+      }
       where = 'rowid = ?';
-      whereArgs = [row['_rowid_']];
+      whereArgs = [rowid];
     } else {
       final cols = row.keys.where((k) => k != '_rowid_').toList();
+      if (cols.isEmpty) {
+        throw StateError(
+          'Cannot update row: no primary key and no _rowid_ available',
+        );
+      }
       where = cols.map((c) => '$c = ?').join(' AND ');
       whereArgs = cols.map((c) => row[c]).toList();
     }

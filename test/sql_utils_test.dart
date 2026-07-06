@@ -2,21 +2,21 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:db_lens/core/utils/sql_utils.dart';
 
 void main() {
-  group('SqlUtils.extractSimpleFromTable', () {
+  group('DbLensSqlUtils.extractSimpleFromTable', () {
     test('extracts table from simple SELECT', () {
       expect(
-        SqlUtils.extractSimpleFromTable('SELECT * FROM users'),
+        DbLensSqlUtils.extractSimpleFromTable('SELECT * FROM users'),
         'users',
       );
       expect(
-        SqlUtils.extractSimpleFromTable('  select id from products where id = 1'),
+        DbLensSqlUtils.extractSimpleFromTable('  select id from products where id = 1'),
         'products',
       );
     });
 
     test('returns null for JOIN queries', () {
       expect(
-        SqlUtils.extractSimpleFromTable(
+        DbLensSqlUtils.extractSimpleFromTable(
           'SELECT * FROM users JOIN orders ON users.id = orders.user_id',
         ),
         isNull,
@@ -25,7 +25,7 @@ void main() {
 
     test('returns null for subqueries', () {
       expect(
-        SqlUtils.extractSimpleFromTable(
+        DbLensSqlUtils.extractSimpleFromTable(
           'SELECT * FROM (SELECT id FROM users) AS sub',
         ),
         isNull,
@@ -33,16 +33,44 @@ void main() {
     });
   });
 
-  group('SqlUtils.isComplexSelectQuery', () {
+  group('DbLensSqlUtils.isComplexSelectQuery', () {
     test('simple query is not complex', () {
-      expect(SqlUtils.isComplexSelectQuery('SELECT * FROM users'), isFalse);
+      expect(DbLensSqlUtils.isComplexSelectQuery('SELECT * FROM users'), isFalse);
     });
 
     test('JOIN is complex', () {
       expect(
-        SqlUtils.isComplexSelectQuery('SELECT * FROM a JOIN b ON a.id = b.id'),
+        DbLensSqlUtils.isComplexSelectQuery('SELECT * FROM a JOIN b ON a.id = b.id'),
         isTrue,
       );
+    });
+  });
+
+  group('DbLensSqlUtils.isSelectQuery', () {
+    test('writable CTE is not select', () {
+      expect(
+        DbLensSqlUtils.isSelectQuery(
+          'WITH cte AS (SELECT id FROM users) DELETE FROM users WHERE id IN (SELECT id FROM cte)',
+        ),
+        isFalse,
+      );
+    });
+
+    test('read-only CTE with SELECT main statement is select', () {
+      expect(
+        DbLensSqlUtils.isSelectQuery(
+          'WITH cte AS (SELECT id FROM users) SELECT * FROM cte',
+        ),
+        isTrue,
+      );
+    });
+
+    test('mutating PRAGMA is not select', () {
+      expect(DbLensSqlUtils.isSelectQuery('PRAGMA journal_mode = WAL'), isFalse);
+    });
+
+    test('read-only PRAGMA is select', () {
+      expect(DbLensSqlUtils.isSelectQuery('PRAGMA table_info(users)'), isTrue);
     });
   });
 }

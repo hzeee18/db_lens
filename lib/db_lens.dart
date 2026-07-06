@@ -6,7 +6,7 @@ export 'core/enums/source_type.dart';
 export 'core/models/db_lens_config.dart';
 export 'core/utils/sql_utils.dart';
 
-// ── Data source contracts (untuk registerSource kustom) ────────────────────
+// ── Data source contracts (custom registerSource) ─────────────────────────
 export 'data/datasources/lens_datasource.dart';
 export 'data/datasources/sqlite/sql_queryable_data_source.dart';
 export 'data/registry/db_lens_registry.dart';
@@ -32,7 +32,7 @@ export 'presentation/controllers/db_lens_query_history_controller.dart';
 export 'presentation/controllers/db_lens_source_controller.dart';
 export 'presentation/controllers/db_lens_table_controller.dart';
 
-// ── Scope & layout (primitive komposisi) ────────────────────────────────────
+// ── Scope & layout (composition primitives) ───────────────────────────────
 export 'presentation/layout/db_lens_layout.dart';
 export 'presentation/scope/db_lens_controller_scope.dart';
 
@@ -53,7 +53,7 @@ export 'presentation/theme/db_lens_theme_data.dart';
 // ── Pages ────────────────────────────────────────────────────────────────
 export 'presentation/pages/db_lens_panel.dart';
 
-// ── Widget library (reusable, dipakai bawaan maupun untuk UI kustom) ───────
+// ── Widget library (built-in + custom UI) ─────────────────────────────────
 export 'presentation/widgets/db_lens_button.dart';
 export 'presentation/widgets/db_lens_cell_editor.dart';
 export 'presentation/widgets/db_lens_chip.dart';
@@ -63,6 +63,7 @@ export 'presentation/widgets/db_lens_empty_state.dart';
 export 'presentation/widgets/db_lens_error_view.dart';
 export 'presentation/widgets/db_lens_highlighted_text.dart';
 export 'presentation/widgets/db_lens_history_entry_view.dart';
+export 'presentation/widgets/db_lens_history_header.dart';
 export 'presentation/widgets/db_lens_history_panel.dart';
 export 'presentation/widgets/db_lens_history_sheet.dart';
 export 'presentation/widgets/db_lens_json_view.dart';

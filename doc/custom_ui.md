@@ -215,9 +215,10 @@ All widgets are headless/reusable and exported from `package:db_lens/db_lens.dar
 
 | Widget | Purpose |
 |---|---|
-| `DbLensHistoryPanel` | Change history panel (embeddable anywhere) |
-| `DbLensHistorySheet` | Modal wrapper around `DbLensHistoryPanel` |
-| `DbLensHistoryEntryView` | Single history entry with diff |
+| `DbLensHistoryHeader` | History title bar — back, search/filter toggles, tracking, clear |
+| `DbLensHistoryPanel` | History entry list; optional `table` scope |
+| `DbLensHistorySheet` | Bottom-sheet wrapper around header + panel |
+| `DbLensHistoryEntryView` | Single entry detail — diff or raw JSON + copy |
 
 ### Utilities
 
@@ -261,6 +262,13 @@ The `source` parameter accepts either `sourceId` or `sourceName`.
 
 ## Change History
 
+History UI is split into a header and a panel so you can embed it in a bottom sheet or a full-page `Scaffold`.
+
+- **`DbLensHistoryHeader`** — title, optional `onBack`, search/filter toggle buttons (collapsed by default), tracking switch, clear.
+- **`DbLensHistoryPanel`** — entry list. Pass `table` to scope to one collection (hides the table picker in filters).
+- **`DbLensHistorySheet`** — thin modal wrapper; also accepts optional `table`.
+- **`DbLensHistoryEntryView`** — per-entry diff (single-column for insert/delete, side-by-side for update) or raw JSON with copy.
+
 ```dart
 DbLens.configureHistory(
   enabled: true,
@@ -270,22 +278,44 @@ DbLens.configureHistory(
 final historyController = DbLens.createHistoryController();
 await historyController.loadFor(sourceId);
 
-// Embed anywhere
-DbLensHistoryPanel(
-  controller: historyController,
-  sourceName: 'Main DB',
-)
+// Full-page
+Scaffold(
+  body: Column(
+    children: [
+      DbLensHistoryHeader(
+        controller: historyController,
+        sourceName: 'Main DB',
+        onBack: () => Navigator.pop(context),
+      ),
+      Expanded(
+        child: DbLensHistoryPanel(
+          controller: historyController,
+          table: 'users', // optional
+        ),
+      ),
+    ],
+  ),
+);
 
-// Or show as modal
+// Modal — all tables
 await DbLensHistorySheet.show(
   context,
   controller: historyController,
   sourceName: 'Main DB',
 );
+
+// Modal — one table
+await DbLensHistorySheet.show(
+  context,
+  controller: historyController,
+  sourceName: 'Main DB',
+  table: 'users',
+);
+
 historyController.dispose();
 ```
 
-History tracking uses polling (`CollectionChangeTracker`) and is disabled in release builds.
+Filters (table + `insert` / `update` / `delete`) live on `DbLensHistoryController`. History tracking uses polling (`CollectionChangeTracker`) and is disabled in release builds.
 
 ---
 
@@ -299,4 +329,4 @@ The `example/` app demonstrates every pattern:
 | `presentation_modes_screen.dart` | `DbLensConfig.presentationMode` |
 | `embedded_panel_screen.dart` | `DbLens.buildPanel()` |
 | `custom_ui_screen.dart` | `DbLensControllerScope` + public widgets, shared controller across routes |
-| `history_demo_screen.dart` | `configureHistory`, `createHistoryController`, `DbLensHistorySheet` |
+| `history_demo_screen.dart` | `configureHistory`, `createHistoryController`, `DbLensHistoryHeader`, `DbLensHistorySheet` |

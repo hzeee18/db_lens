@@ -6,25 +6,23 @@ import '../theme/db_lens_theme.dart';
 import 'db_lens_empty_state.dart';
 import 'db_lens_history_entry_view.dart';
 
-/// Konten riwayat perubahan data — search, toggle tracking, list entri.
+/// History entry list. Search/filter panels open from [DbLensHistoryHeader].
 ///
-/// Widget biasa, TIDAK terikat ke bottom sheet — bisa ditempel di
-/// `Scaffold` biasa, tab, atau dibungkus modal lewat [DbLensHistorySheet].
-/// (Sebelumnya konten ini terkunci privat di dalam sheet, sehingga
-/// konsumen yang butuh tampilan full-page terpaksa menulis ulang total.)
+/// Pass [table] to scope entries to one collection.
 class DbLensHistoryPanel extends StatefulWidget {
   const DbLensHistoryPanel({
     super.key,
     required this.controller,
-    this.sourceName,
+    this.table,
     this.onEntryTap,
-    this.showHeader = true,
   });
 
   final DbLensHistoryController controller;
-  final String? sourceName;
+
+  /// Scope entries to this collection only.
+  final String? table;
+
   final void Function(BuildContext context, HistoryEntry entry)? onEntryTap;
-  final bool showHeader;
 
   @override
   State<DbLensHistoryPanel> createState() => _DbLensHistoryPanelState();
@@ -38,6 +36,7 @@ class _DbLensHistoryPanelState extends State<DbLensHistoryPanel> {
     super.initState();
     widget.controller.addListener(_onControllerChanged);
     widget.controller.startListening();
+    _searchController.text = widget.controller.searchText;
   }
 
   @override
@@ -52,25 +51,17 @@ class _DbLensHistoryPanelState extends State<DbLensHistoryPanel> {
     if (mounted) setState(() {});
   }
 
-  Future<void> _confirmClear(BuildContext context) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Clear history'),
-        content: const Text('Hapus semua riwayat perubahan untuk source ini?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Clear'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed == true) await widget.controller.clear();
+  List<HistoryEntry> _visibleEntries(DbLensHistoryController c) {
+    final entries = c.filteredEntries;
+    final table = widget.table;
+    if (table == null) return entries;
+    return entries.where((e) => e.collection == table).toList();
+  }
+
+  bool _hasEntriesForScope(DbLensHistoryController c) {
+    final table = widget.table;
+    if (table == null) return !c.isEmpty;
+    return c.entries.any((e) => e.collection == table);
   }
 
   void _openEntry(BuildContext context, HistoryEntry entry) {
@@ -85,76 +76,29 @@ class _DbLensHistoryPanelState extends State<DbLensHistoryPanel> {
   Widget build(BuildContext context) {
     final theme = DbLensThemeScope.of(context);
     final c = widget.controller;
+    final hasScopeData = _hasEntriesForScope(c);
 
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (widget.showHeader) _buildHeader(context, theme, c),
-        if (!c.isEmpty) _buildSearchField(theme, c),
+        if (hasScopeData && c.searchExpanded) _buildSearchField(theme, c),
+        if (hasScopeData && c.filtersExpanded) _buildFilters(theme, c),
         Divider(height: 1, color: theme.border),
         Expanded(child: _buildBody(theme, c)),
       ],
     );
   }
 
-  Widget _buildHeader(BuildContext context, DbLensTheme theme, DbLensHistoryController c) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 4, 8, 12),
-      child: Row(
-        children: [
-          Icon(Icons.history, size: 18, color: theme.accent),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Change History',
-                  style: TextStyle(color: theme.textPrimary, fontSize: 15, fontWeight: FontWeight.w600),
-                ),
-                if (widget.sourceName != null)
-                  Text(widget.sourceName!, style: TextStyle(color: theme.textMuted, fontSize: 11)),
-              ],
-            ),
-          ),
-          if (c.canToggleTracking) _buildTrackingToggle(theme, c),
-          if (!c.isEmpty)
-            TextButton(onPressed: () => _confirmClear(context), child: const Text('Clear')),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTrackingToggle(DbLensTheme theme, DbLensHistoryController c) {
-    final enabled = c.trackingEnabled;
-    return Tooltip(
-      message: enabled ? 'Pause tracking' : 'Resume tracking',
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text('Track', style: TextStyle(color: theme.textMuted, fontSize: 11)),
-          Transform.scale(
-            scale: 0.75,
-            child: Switch(
-              value: enabled,
-              activeThumbColor: theme.accent,
-              onChanged: c.setTrackingEnabled,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildSearchField(DbLensTheme theme, DbLensHistoryController c) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
       child: TextField(
         controller: _searchController,
+        autofocus: true,
         onChanged: c.setSearchText,
         decoration: theme.fieldDecoration(
-          hintText: 'Search by table or row...',
+          hintText: 'Search by row...',
           prefixIcon: const Icon(Icons.search, size: 18),
           suffixIcon: c.searchText.isEmpty
               ? null
@@ -171,6 +115,66 @@ class _DbLensHistoryPanelState extends State<DbLensHistoryPanel> {
     );
   }
 
+  Widget _buildFilters(DbLensTheme theme, DbLensHistoryController c) {
+    final tables = c.availableTables;
+    final showTablePicker = widget.table == null && tables.length > 1;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (showTablePicker)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: DropdownButtonFormField<String?>(
+                value: c.tableFilter,
+                isExpanded: true,
+                decoration: theme.fieldDecoration(
+                  hintText: 'All tables',
+                  prefixIcon: const Icon(Icons.table_chart_outlined, size: 18),
+                ),
+                items: [
+                  const DropdownMenuItem<String?>(
+                    value: null,
+                    child: Text('All tables'),
+                  ),
+                  for (final table in tables)
+                    DropdownMenuItem<String?>(
+                      value: table,
+                      child: Text(table),
+                    ),
+                ],
+                onChanged: c.setTableFilter,
+              ),
+            ),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              for (final type in HistoryChangeType.values)
+                FilterChip(
+                  label: Text(type.name),
+                  selected: c.changeTypeFilter.contains(type),
+                  onSelected: (_) => c.toggleChangeTypeFilter(type),
+                  selectedColor: _colorFor(type, theme).withValues(alpha: 0.2),
+                  checkmarkColor: _colorFor(type, theme),
+                  labelStyle: TextStyle(
+                    color: c.changeTypeFilter.contains(type)
+                        ? _colorFor(type, theme)
+                        : theme.textSecondary,
+                    fontSize: 12,
+                  ),
+                  side: BorderSide(color: theme.border),
+                  visualDensity: VisualDensity.compact,
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildBody(DbLensTheme theme, DbLensHistoryController c) {
     if (c.loading) {
       return Center(
@@ -181,24 +185,31 @@ class _DbLensHistoryPanelState extends State<DbLensHistoryPanel> {
       );
     }
 
-    if (c.isEmpty) {
+    if (!_hasEntriesForScope(c)) {
+      final table = widget.table;
       return DbLensEmptyState(
         icon: Icons.history_toggle_off,
-        title: 'No changes yet',
-        subtitle: 'Perubahan data akan muncul di sini setelah terdeteksi.',
+        title: table != null ? 'No changes for "$table"' : 'No changes yet',
+        subtitle: table != null
+            ? 'No changes recorded for this table yet.'
+            : 'Changes appear here once tracking detects them.',
         theme: theme,
       );
     }
 
-    final filtered = c.filteredEntries;
+    final filtered = _visibleEntries(c);
     if (filtered.isEmpty) {
       return DbLensEmptyState(
         icon: Icons.search_off_outlined,
-        title: 'No results for "${c.searchText.trim()}"',
-        subtitle: 'Try a different table or row name',
+        title: c.hasActiveFilters ? 'No matching changes' : 'No results',
+        subtitle: c.hasActiveFilters
+            ? 'Try a different table, change type, or search term'
+            : 'Try a different row name',
         theme: theme,
       );
     }
+
+    final showCollection = widget.table == null;
 
     return ListView.separated(
       padding: const EdgeInsets.symmetric(vertical: 8),
@@ -210,11 +221,13 @@ class _DbLensHistoryPanelState extends State<DbLensHistoryPanel> {
           onTap: () => _openEntry(context, entry),
           leading: Icon(_iconFor(entry.changeType), color: _colorFor(entry.changeType, theme)),
           title: Text(
-            entry.collection,
+            showCollection ? entry.collection : entry.rowKey,
             style: TextStyle(color: theme.textPrimary, fontWeight: FontWeight.w500),
           ),
           subtitle: Text(
-            '${entry.changeType.name} · ${entry.rowKey}',
+            showCollection
+                ? '${entry.changeType.name} · ${entry.rowKey}'
+                : entry.changeType.name,
             style: TextStyle(color: theme.textMuted, fontSize: 12),
           ),
           trailing: Text(_formatTime(entry.createdAt), style: TextStyle(color: theme.textMuted, fontSize: 11)),

@@ -1,9 +1,9 @@
 import 'dart:convert';
 
-/// Jenis perubahan satu field antara "before" dan "after".
+/// Field diff kind between before/after snapshots.
 enum DbLensDiffKind { added, removed, changed, unchanged }
 
-/// Hasil diff satu field/kolom antara dua snapshot baris.
+/// One field diff result.
 class DbLensDiffField {
   const DbLensDiffField({
     required this.key,
@@ -18,8 +18,7 @@ class DbLensDiffField {
   final DbLensDiffKind kind;
 }
 
-/// Menghitung diff per-field antara JSON "before" dan "after" milik satu
-/// [HistoryEntry].
+/// Computes field-level diffs from history entry JSON snapshots.
 class DbLensHistoryDiffUtils {
   const DbLensHistoryDiffUtils._();
 

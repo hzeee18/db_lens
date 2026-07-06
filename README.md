@@ -18,7 +18,7 @@ A Flutter **Database Inspector Framework** for inspecting SQLite and SharedPrefe
 
 ```yaml
 dev_dependencies:
-  db_lens: ^1.0.0
+  db_lens: ^1.0.1
 ```
 
 ---
@@ -165,7 +165,9 @@ Switch between sources inside the panel. Search and filter source and collection
 
 ## Change History
 
-Track insert/update/delete changes across registered collections (debug builds only):
+Track insert/update/delete changes across registered collections (debug builds only).
+
+Compose the header and panel separately — the header owns navigation, search/filter toggles, tracking, and clear; the panel owns the entry list.
 
 ```dart
 DbLens.configureHistory(pollInterval: const Duration(seconds: 5));
@@ -173,12 +175,53 @@ DbLens.configureHistory(pollInterval: const Duration(seconds: 5));
 final historyController = DbLens.createHistoryController();
 await historyController.loadFor(sourceId);
 
-// Modal bottom sheet
-await DbLensHistorySheet.show(context, controller: historyController, sourceName: 'Main DB');
+// Modal bottom sheet (all tables)
+await DbLensHistorySheet.show(
+  context,
+  controller: historyController,
+  sourceName: 'Main DB',
+);
 
-// Or embed the panel anywhere
-DbLensHistoryPanel(controller: historyController, sourceName: 'Main DB')
+// Modal bottom sheet scoped to one table
+await DbLensHistorySheet.show(
+  context,
+  controller: historyController,
+  sourceName: 'Main DB',
+  table: 'users',
+);
+
+// Full-page route
+Navigator.push(
+  context,
+  MaterialPageRoute(
+    builder: (context) => Scaffold(
+      body: Column(
+        children: [
+          DbLensHistoryHeader(
+            controller: historyController,
+            sourceName: 'Main DB',
+            onBack: () => Navigator.pop(context),
+          ),
+          Expanded(
+            child: DbLensHistoryPanel(
+              controller: historyController,
+              table: 'users', // optional — scope to one collection
+            ),
+          ),
+        ],
+      ),
+    ),
+  ),
+);
+historyController.dispose();
 ```
+
+| Widget | Role |
+|---|---|
+| `DbLensHistoryHeader` | Title, optional back, search/filter toggles, tracking, clear |
+| `DbLensHistoryPanel` | Entry list; optional `table` scope |
+| `DbLensHistorySheet` | Bottom-sheet wrapper around header + panel |
+| `DbLensHistoryEntryView` | Entry detail with diff or raw JSON + copy |
 
 ---
 
@@ -195,7 +238,7 @@ DbLensHistoryPanel(controller: historyController, sourceName: 'Main DB')
 | 📋 | Tap row → JSON bottom sheet; long-press → copy or edit cell |
 | ✏️ | Edit cell values (SQLite `UPDATE` / SharedPreferences `set*`) |
 | 📤 | Copy all rows as JSON |
-| 📜 | Change history with before/after diff (polling-based) |
+| 📜 | Change history with diff view, filters, and copy JSON (polling-based) |
 | 🧩 | Headless controllers + reusable widget library for custom UI |
 | 🎨 | `DbLensThemeData` — customizable panel colors |
 | 🔄 | Refresh on demand |

@@ -1,8 +1,8 @@
 # db_lens 🔍
 
-A Flutter debug tool for inspecting SQLite and SharedPreferences directly on device — no adb, no external tools, no laptop needed.
+A Flutter **Database Inspector Framework** for inspecting SQLite and SharedPreferences directly on device — no adb, no external tools, no laptop needed.
 
-> Designed for QA and developers. Works out of the box. Hidden in release builds (`kReleaseMode`).
+> Designed for QA and developers. Works out of the box (`DbLens.open()`), or compose your own UI from headless controllers and reusable widgets. Hidden in release builds (`kReleaseMode`).
 
 ---
 
@@ -18,7 +18,7 @@ A Flutter debug tool for inspecting SQLite and SharedPreferences directly on dev
 
 ```yaml
 dev_dependencies:
-  db_lens: ^0.0.4
+  db_lens: ^1.0.0
 ```
 
 ---
@@ -27,6 +27,8 @@ dev_dependencies:
 
 ```dart
 import 'package:db_lens/db_lens.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:sqflite/sqflite.dart';
 
 // SQLite
 final db = await openDatabase('my_app.db');
@@ -36,7 +38,7 @@ DbLens.register('Main DB', db);
 final prefs = await SharedPreferences.getInstance();
 DbLens.registerSharedPreferences('App Prefs', prefs);
 
-// Open the inspector
+// Open the built-in inspector (bottom sheet by default)
 DbLens.open(context);
 ```
 
@@ -47,10 +49,8 @@ DbLens.open(context);
 Drop it anywhere — app bar, drawer, debug menu, settings page. Automatically hidden in release builds.
 
 ```dart
-// Default
 DbLensButton()
 
-// Custom label, icon, and style
 DbLensButton(
   label: 'Inspect Data',
   icon: Icons.bug_report,
@@ -60,9 +60,81 @@ DbLensButton(
 
 ---
 
-## Dynamic Theme
+## Presentation Modes
 
-Match the panel to your app's `MaterialApp` theme, or pass custom colors.
+`DbLens.open()` supports two navigation modes via `DbLensConfig.presentationMode`:
+
+```dart
+// Bottom sheet (default)
+DbLens.open(context);
+
+// Full-screen route
+DbLens.open(
+  context,
+  config: const DbLensConfig(
+    presentationMode: DbLensPresentationMode.fullPage,
+    fullscreenDialog: true,
+  ),
+);
+```
+
+To embed the inspector directly in your widget tree (e.g. a debug tab), use `DbLens.buildPanel()` instead — no navigation involved:
+
+```dart
+Scaffold(
+  body: DbLens.buildPanel(
+    theme: DbLensThemeData.fromMaterialTheme(Theme.of(context)),
+  ),
+)
+```
+
+---
+
+## Custom UI
+
+For full control, compose your own inspector from public widgets and sub-controllers:
+
+```dart
+DbLensControllerScope(
+  theme: DbLensThemeData.fromMaterialTheme(Theme.of(context)),
+  child: DbLensLayout(
+    sidebar: const DbLensSourceList(),
+    toolbar: const DbLensToolbar(actions: [DbLensRefreshAction()]),
+    body: Builder(
+      builder: (context) {
+        final c = DbLensControllerScope.of(context);
+        return AnimatedBuilder(
+          animation: c.table,
+          builder: (context, _) {
+            final columns = c.activeColumns;
+            return DbLensTableView(
+              rows: c.visibleRows(columns: columns),
+              columns: columns,
+            );
+          },
+        );
+      },
+    ),
+  ),
+)
+```
+
+`DbLensController` is split into focused sub-controllers — use only what you need:
+
+| Sub-controller | Responsibility |
+|---|---|
+| `controller.source` | Sources, collections, selection |
+| `controller.table` | Rows, search, pagination |
+| `controller.query` | Raw SQL mode |
+| `controller.queryHistory` | Per-session SQL history |
+| `controller.edit` | Cell editing |
+| `controller.browse` | Browse-all-sources snapshot |
+
+See [doc/custom_ui.md](doc/custom_ui.md) for the full composition guide, widget reference, direct data access API, and change history integration.
+
+---
+
+## Dynamic Theme
 
 ```dart
 DbLens.open(
@@ -91,6 +163,25 @@ Switch between sources inside the panel. Search and filter source and collection
 
 ---
 
+## Change History
+
+Track insert/update/delete changes across registered collections (debug builds only):
+
+```dart
+DbLens.configureHistory(pollInterval: const Duration(seconds: 5));
+
+final historyController = DbLens.createHistoryController();
+await historyController.loadFor(sourceId);
+
+// Modal bottom sheet
+await DbLensHistorySheet.show(context, controller: historyController, sourceName: 'Main DB');
+
+// Or embed the panel anywhere
+DbLensHistoryPanel(controller: historyController, sourceName: 'Main DB')
+```
+
+---
+
 ## Features
 
 | | |
@@ -104,6 +195,8 @@ Switch between sources inside the panel. Search and filter source and collection
 | 📋 | Tap row → JSON bottom sheet; long-press → copy or edit cell |
 | ✏️ | Edit cell values (SQLite `UPDATE` / SharedPreferences `set*`) |
 | 📤 | Copy all rows as JSON |
+| 📜 | Change history with before/after diff (polling-based) |
+| 🧩 | Headless controllers + reusable widget library for custom UI |
 | 🎨 | `DbLensThemeData` — customizable panel colors |
 | 🔄 | Refresh on demand |
 | 💾 | Multiple source support |
@@ -119,6 +212,9 @@ DbLens.open(
   config: const DbLensConfig(
     pageSize: 20,
     enablePrefetch: true,
+    enableHistory: true,
+    historyPollInterval: Duration(seconds: 5),
+    presentationMode: DbLensPresentationMode.bottomSheet,
   ),
 );
 ```
@@ -127,12 +223,28 @@ DbLens.open(
 
 ## Example App
 
-Run the included example to try every feature (SQLite + SharedPreferences, themed open, export, edit, JSON view):
+Run the included example to try every integration pattern:
 
 ```bash
 cd example
 flutter run
 ```
+
+Demos include bottom sheet, full page, embedded panel, custom UI composition, and change history. See [example/README.md](example/README.md).
+
+---
+
+## Migrating from 0.0.x
+
+| 0.0.x | 1.0.0 |
+|---|---|
+| `DbLens.openPage()` | `DbLens.open(context, config: DbLensConfig(presentationMode: fullPage))` |
+| `DbLens.openCustom()` | `DbLensControllerScope` + compose widgets yourself |
+| `DbLensInspectorScope` | `DbLensControllerScope` |
+| `DbLensPresentationMode.embedded` | `DbLens.buildPanel()` |
+| `controller.sources` | `controller.source.sources` |
+| `controller.searchText` | `controller.table.searchText` |
+| `controller.pagination` | `controller.table.pagination` |
 
 ---
 

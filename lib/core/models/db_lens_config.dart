@@ -33,6 +33,6 @@ class DbLensConfig {
   /// Mode presentasi default saat dipanggil lewat [DbLens.open].
   final DbLensPresentationMode presentationMode;
 
-  /// Hanya dipakai saat presentationMode == fullPage / DbLens.openPage.
+  /// Only used when [presentationMode] is [DbLensPresentationMode.fullPage].
   final bool fullscreenDialog;
 }

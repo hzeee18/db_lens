@@ -1,44 +1,44 @@
-## Unreleased
+## 1.0.0
 
-Refactor arsitektur besar: `db_lens` dari "UI siap pakai" jadi "Database Inspector Framework" — bisa dipakai penuh (`DbLens.open()`) atau disusun sendiri dari widget dan controller kecil. Breaking change disengaja (pre-1.0, tidak ada usaha menjaga backward-compat dengan 0.0.6).
+Major architecture refactor: `db_lens` from "ready-to-use UI" to "Database Inspector Framework" — usable out of the box (`DbLens.open()`) or composed from small widgets and controllers. Intentional breaking change (pre-1.0, no effort to maintain backward compatibility with 0.0.6).
 
-* **Controller**: `DbLensController` monolitik (848 baris) dipecah jadi 6 sub-controller kecil (`source`, `table`, `query`, `queryHistory`, `edit`, `browse`) digabung lewat `Listenable.merge`. Field lama seperti `controller.sources`/`controller.searchText`/`controller.pagination` pindah ke sub-controller terkait (mis. `controller.source.sources`, `controller.table.searchText`) — **tidak ada getter kompatibilitas**.
-* **Scope**: `DbLensCustomHost` dan `DbLensInspectorScope` dihapus, diganti `DbLensControllerScope` (InheritedNotifier murni, tidak memaksa rebuild subtree) + `DbLensLayout` (slot-based: header/sidebar/toolbar/body/bottomBar).
-* **Widget library baru**: `DbLensDataGrid`, `DbLensTableView`, `DbLensListView`, `DbLensJsonView`, `DbLensEmptyState`, `DbLensLoadingView`, `DbLensErrorView`, `DbLensCellEditor`, `DbLensSourceList`, `DbLensCollectionList`, `DbLensSearchBar`, `DbLensToolbar`, `DbLensStatusBar`, `DbLensQueryEditor`, `DbLensPaginationBar`, `DbLensHistoryPanel`, `DbLensHistoryEntryView`, `DbLensQueryHistoryList` — semua headless/reusable, diekspor lewat `db_lens.dart`. `DbLensPanel` bawaan kini disusun dari widget-widget publik ini, bukan implementasi paralel.
-* **`DbLensHistoryPanel`** kini widget biasa yang tidak terkunci ke bottom sheet — bisa ditempel di `Scaffold`/tab custom. `DbLensHistorySheet` jadi wrapper modal tipis di atasnya.
-* **Hook ekstensibilitas baru**: `DbLensValueRenderer`/`DbLensValueFormat`, `DbLensCellEditorBuilder`, `DbLensExportFormat`, `DbLensAction`.
-* **`DbLensQueryHistoryController`** — riwayat eksekusi SQL per session (cap 40 entri), konsep baru untuk `DbLensQueryEditor`/`DbLensQueryHistoryList`.
-* **Facade `DbLens`** disederhanakan: dihapus `unregister`, `databaseNames`, `getDatabase`, `getTables`, `getRows`, `getRowCount`, `getColumns`, `runRawQueryPaged`, `runRawQueryCount`, `openPage`, `openCustom`. `openPage`/`openCustom` dilebur ke `DbLens.open(context, config: ...)` + `DbLensControllerScope` langsung untuk custom shell.
-* **API akses data langsung** untuk UI custom tanpa controller: `DbLens.registry` (akses `getSources()` / `LensDataSource` langsung), `DbLens.runRawQuery(source, sql)` (SELECT tanpa pagination), dan `DbLens.executeStatement(source, sql)`. Parameter `source` menerima sourceId maupun sourceName.
-* **`DbLensPresentationMode.embedded`** dihapus — untuk embed pakai `DbLens.buildPanel()`.
-* Use-case layer (11 file pass-through di `domain/usecases/`) dihapus; controller memanggil `LensRepository`/`HistoryRepository` langsung.
-* `DbLensInfiniteScrollController` (dead code, tidak pernah dipakai) dihapus total.
-* Validasi edit cell SharedPreferences dipindah dari controller ke `SharedPreferencesDataSource.updateCell` (perbaikan SRP).
+* **Controller**: Monolithic `DbLensController` (848 lines) split into 6 small sub-controllers (`source`, `table`, `query`, `queryHistory`, `edit`, `browse`) combined via `Listenable.merge`. Legacy fields such as `controller.sources`/`controller.searchText`/`controller.pagination` moved to related sub-controllers (e.g. `controller.source.sources`, `controller.table.searchText`) — **no compatibility getters**.
+* **Scope**: `DbLensCustomHost` and `DbLensInspectorScope` removed, replaced by `DbLensControllerScope` (pure InheritedNotifier, does not force subtree rebuild) + `DbLensLayout` (slot-based: header/sidebar/toolbar/body/bottomBar).
+* **New widget library**: `DbLensDataGrid`, `DbLensTableView`, `DbLensListView`, `DbLensJsonView`, `DbLensEmptyState`, `DbLensLoadingView`, `DbLensErrorView`, `DbLensCellEditor`, `DbLensSourceList`, `DbLensCollectionList`, `DbLensSearchBar`, `DbLensToolbar`, `DbLensStatusBar`, `DbLensQueryEditor`, `DbLensPaginationBar`, `DbLensHistoryPanel`, `DbLensHistoryEntryView`, `DbLensQueryHistoryList` — all headless/reusable, exported via `db_lens.dart`. Built-in `DbLensPanel` is now composed from these public widgets, not a parallel implementation.
+* **`DbLensHistoryPanel`** is now a regular widget not locked to a bottom sheet — can be placed in a custom `Scaffold`/tab. `DbLensHistorySheet` becomes a thin modal wrapper on top.
+* **New extensibility hooks**: `DbLensValueRenderer`/`DbLensValueFormat`, `DbLensCellEditorBuilder`, `DbLensExportFormat`, `DbLensAction`.
+* **`DbLensQueryHistoryController`** — per-session SQL execution history (40-entry cap), new concept for `DbLensQueryEditor`/`DbLensQueryHistoryList`.
+* **`DbLens` facade simplified**: removed `unregister`, `databaseNames`, `getDatabase`, `getTables`, `getRows`, `getRowCount`, `getColumns`, `runRawQueryPaged`, `runRawQueryCount`, `openPage`, `openCustom`. `openPage`/`openCustom` merged into `DbLens.open(context, config: ...)` + `DbLensControllerScope` directly for custom shells.
+* **Direct data access API** for custom UI without a controller: `DbLens.registry` (direct access to `getSources()` / `LensDataSource`), `DbLens.runRawQuery(source, sql)` (SELECT without pagination), and `DbLens.executeStatement(source, sql)`. The `source` parameter accepts sourceId or sourceName.
+* **`DbLensPresentationMode.embedded`** removed — use `DbLens.buildPanel()` for embedding.
+* Use-case layer (11 pass-through files in `domain/usecases/`) removed; controllers call `LensRepository`/`HistoryRepository` directly.
+* `DbLensInfiniteScrollController` (dead code, never used) removed entirely.
+* SharedPreferences cell edit validation moved from controller to `SharedPreferencesDataSource.updateCell` (SRP fix).
 
-**Technical debt yang sengaja ditunda** (bukan lupa — di luar cakupan refactor arsitektur widget/controller ini):
-* `SourceType` masih enum tertutup, belum dibuka jadi tipe ekstensibel untuk custom data source di luar SQLite/SharedPreferences.
-* Mekanisme polling history (`CollectionChangeTracker`) belum diganti event-based.
+**Intentionally deferred technical debt** (not forgotten — out of scope for this widget/controller architecture refactor):
+* `SourceType` remains a closed enum, not yet opened into an extensible type for custom data sources beyond SQLite/SharedPreferences.
+* History polling mechanism (`CollectionChangeTracker`) not yet replaced with event-based approach.
 
 ## 0.0.6
 
-* Browse snapshot API untuk custom full-page inspector — `loadBrowseSnapshot()`, `refreshBrowse()`, `setBrowseSearchText()`, dan `filteredBrowseSnapshot` di `DbLensController`
-* Model `BrowseSourceSnapshot` / `BrowseCollectionSnapshot` untuk daftar semua sumber + koleksi beserta row count di awal
-* `DbLensCustomHost` menerima `controller` opsional (sama seperti `DbLensInspectorScope`) agar route detail bisa berbagi controller
-* Example app: browse home + detail route dengan controller bersama
-* Change History — pelacakan insert/update/delete otomatis lewat polling + diffing untuk semua collection yang terdaftar
-* Riwayat disimpan permanen di database privat db_lens (`db_lens_history.db`) dengan opsi clear per source
-* Panel History di level source (tombol di header) menampilkan entri dengan detail before/after JSON
-* `DbLens.configureHistory()` dan `DbLens.createHistoryController()` sebagai API publik baru
-* `LensDataSource.identityColumns()` — method baru untuk identitas baris saat diffing (breaking change minor untuk custom implementer)
-* Export `DbLensController` sebagai public headless API untuk custom UI
-* Tambah `DbLensPresentationMode` (bottomSheet, fullPage, embedded)
-* Tambah `DbLens.openPage()` untuk inspector full-screen
-* Tambah `DbLens.openCustom()` builder hook untuk shell UI custom sepenuhnya
-* Tambah `DbLens.buildPanel()` untuk widget inspector yang di-embed
-* Tambah `DbLensInspectorScope` untuk manajemen lifecycle controller di custom UI
-* Extend `DbLensConfig` dengan `presentationMode` dan `fullscreenDialog`
-* Dokumentasi pattern custom UI di README/doc/custom_ui.md
-* Example app: demo full-page dan custom controller
+* Browse snapshot API for custom full-page inspector — `loadBrowseSnapshot()`, `refreshBrowse()`, `setBrowseSearchText()`, and `filteredBrowseSnapshot` on `DbLensController`
+* `BrowseSourceSnapshot` / `BrowseCollectionSnapshot` models for listing all sources + collections with row counts upfront
+* `DbLensCustomHost` accepts optional `controller` (same as `DbLensInspectorScope`) so detail routes can share a controller
+* Example app: browse home + detail route with shared controller
+* Change History — automatic insert/update/delete tracking via polling + diffing for all registered collections
+* History persisted in db_lens private database (`db_lens_history.db`) with per-source clear option
+* Source-level History panel (header button) shows entries with before/after JSON details
+* `DbLens.configureHistory()` and `DbLens.createHistoryController()` as new public APIs
+* `LensDataSource.identityColumns()` — new method for row identity during diffing (minor breaking change for custom implementers)
+* Export `DbLensController` as public headless API for custom UI
+* Add `DbLensPresentationMode` (bottomSheet, fullPage, embedded)
+* Add `DbLens.openPage()` for full-screen inspector
+* Add `DbLens.openCustom()` builder hook for fully custom UI shells
+* Add `DbLens.buildPanel()` for embedded inspector widget
+* Add `DbLensInspectorScope` for controller lifecycle management in custom UI
+* Extend `DbLensConfig` with `presentationMode` and `fullscreenDialog`
+* Custom UI pattern documentation in README/doc/custom_ui.md
+* Example app: full-page and custom controller demos
 
 # 0.0.5
 

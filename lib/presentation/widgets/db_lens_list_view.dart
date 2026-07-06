@@ -337,11 +337,6 @@ class _RowCardState extends State<_RowCard> {
                           ),
                         ),
                       ),
-                      if (editable)
-                        Padding(
-                          padding: const EdgeInsets.only(left: 2),
-                          child: Icon(Icons.edit_rounded, size: 9, color: theme.accent),
-                        ),
                     ],
                   ),
                 ),

@@ -1,14 +1,19 @@
-import 'package:flutter/material.dart';
+import 'dart:convert';
 
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+
+import '../controllers/db_lens_controller.dart';
 import '../hooks/db_lens_value_renderer.dart';
 import '../theme/db_lens_theme.dart';
+import '../utils/db_lens_cell_edit.dart';
+import '../utils/db_lens_snackbar.dart';
+import '../utils/db_lens_row_id_utils.dart';
 
-/// Tampilan baris sebagai kartu yang bisa di-expand — preview beberapa
-/// kolom pertama, tap untuk lihat semua field, long-press field untuk edit
-/// (kalau [canEditColumn] mengizinkan).
+/// Expandable row cards — preview columns, copy JSON, search highlight, edit.
 ///
-/// Murni presentational: menerima data + callback, tidak menerima
-/// controller apa pun.
+/// When [onEditCell] is omitted, [DbLensCellEdit.run] is used automatically
+/// (via [onSaveCell], [controller], or nearest [DbLensControllerScope]).
 class DbLensListView extends StatelessWidget {
   const DbLensListView({
     super.key,
@@ -16,8 +21,12 @@ class DbLensListView extends StatelessWidget {
     required this.columns,
     this.rowNumberStart = 1,
     this.previewColumnCount = 2,
+    this.searchQuery = '',
     this.canEditColumn,
     this.onEditCell,
+    this.onSaveCell,
+    this.controller,
+    this.isSQLite,
     this.onCopyRow,
     this.valueRenderer,
     this.padding = const EdgeInsets.all(12),
@@ -27,12 +36,38 @@ class DbLensListView extends StatelessWidget {
   final List<String> columns;
   final int rowNumberStart;
   final int previewColumnCount;
+  final String searchQuery;
   final bool Function(String column)? canEditColumn;
-  final void Function(String column, Object? currentValue, Map<String, Object?> row)?
+  final Future<void> Function(String column, Object? currentValue, Map<String, Object?> row)?
       onEditCell;
+  final Future<bool> Function(String column, Object? newValue, Map<String, Object?> row)?
+      onSaveCell;
+  final DbLensController? controller;
+  final bool? isSQLite;
   final void Function(Map<String, Object?> row)? onCopyRow;
   final DbLensValueRenderer? valueRenderer;
   final EdgeInsets padding;
+
+  /// Default edit handler — dialog + save via controller or [onSaveCell].
+  static Future<void> defaultEditCell(
+    BuildContext context, {
+    required String column,
+    required Object? currentValue,
+    required Map<String, Object?> row,
+    Future<bool> Function(String column, Object? newValue, Map<String, Object?> row)? onSave,
+    DbLensController? controller,
+    bool? isSQLite,
+  }) {
+    return DbLensCellEdit.run(
+      context,
+      column: column,
+      currentValue: currentValue,
+      row: row,
+      onSave: onSave,
+      controller: controller,
+      isSQLite: isSQLite,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -40,13 +75,17 @@ class DbLensListView extends StatelessWidget {
       padding: padding,
       itemCount: rows.length,
       separatorBuilder: (_, __) => const SizedBox(height: 8),
-      itemBuilder: (context, index) => _DbLensListCard(
+      itemBuilder: (context, index) => _RowCard(
         row: rows[index],
         columns: columns,
         rowNum: rowNumberStart + index,
         previewColumnCount: previewColumnCount,
+        searchQuery: searchQuery,
         canEditColumn: canEditColumn,
         onEditCell: onEditCell,
+        onSaveCell: onSaveCell,
+        controller: controller,
+        isSQLite: isSQLite,
         onCopyRow: onCopyRow,
         valueRenderer: valueRenderer,
       ),
@@ -54,14 +93,18 @@ class DbLensListView extends StatelessWidget {
   }
 }
 
-class _DbLensListCard extends StatefulWidget {
-  const _DbLensListCard({
+class _RowCard extends StatefulWidget {
+  const _RowCard({
     required this.row,
     required this.columns,
     required this.rowNum,
     required this.previewColumnCount,
+    required this.searchQuery,
     this.canEditColumn,
     this.onEditCell,
+    this.onSaveCell,
+    this.controller,
+    this.isSQLite,
     this.onCopyRow,
     this.valueRenderer,
   });
@@ -70,30 +113,97 @@ class _DbLensListCard extends StatefulWidget {
   final List<String> columns;
   final int rowNum;
   final int previewColumnCount;
+  final String searchQuery;
   final bool Function(String column)? canEditColumn;
-  final void Function(String column, Object? currentValue, Map<String, Object?> row)?
+  final Future<void> Function(String column, Object? currentValue, Map<String, Object?> row)?
       onEditCell;
+  final Future<bool> Function(String column, Object? newValue, Map<String, Object?> row)?
+      onSaveCell;
+  final DbLensController? controller;
+  final bool? isSQLite;
   final void Function(Map<String, Object?> row)? onCopyRow;
   final DbLensValueRenderer? valueRenderer;
 
   @override
-  State<_DbLensListCard> createState() => _DbLensListCardState();
+  State<_RowCard> createState() => _RowCardState();
 }
 
-class _DbLensListCardState extends State<_DbLensListCard> {
+class _RowCardState extends State<_RowCard> {
   bool _expanded = false;
 
-  Widget _renderValue(BuildContext context, Object? value, DbLensTheme theme) {
-    if (widget.valueRenderer != null) return widget.valueRenderer!(context, value, theme);
+  Future<void> _editCell(BuildContext context, String column, Object? value) async {
+    if (widget.onEditCell != null) {
+      await widget.onEditCell!(column, value, widget.row);
+      return;
+    }
+
+    await DbLensCellEdit.run(
+      context,
+      column: column,
+      currentValue: value,
+      row: widget.row,
+      onSave: widget.onSaveCell,
+      controller: widget.controller,
+      isSQLite: widget.isSQLite,
+    );
+  }
+
+  void _copyJson(BuildContext context) {
+    if (widget.onCopyRow != null) {
+      widget.onCopyRow!(widget.row);
+      return;
+    }
+
+    final exportRow = Map<String, Object?>.from(
+      withoutRowIdEntry(Map<String, dynamic>.from(widget.row)),
+    );
+    Clipboard.setData(
+      ClipboardData(text: const JsonEncoder.withIndent('  ').convert(exportRow)),
+    );
+    showDbLensSnack(context, 'Copied as JSON');
+  }
+
+  TextStyle _valueStyle(DbLensTheme theme, Object? value, {double? fontSize, FontWeight? weight}) {
+    return TextStyle(
+      color: DbLensValueFormat.color(value, theme),
+      fontSize: fontSize ?? DbLensTheme.dataFontSize,
+      fontWeight: weight,
+      height: 1.4,
+      fontStyle: value == null ? FontStyle.italic : FontStyle.normal,
+    );
+  }
+
+  Widget _renderPreviewValue(BuildContext context, Object? value, DbLensTheme theme) {
+    if (widget.valueRenderer != null) {
+      return widget.valueRenderer!(context, value, theme);
+    }
     return Text(
       DbLensValueFormat.format(value),
-      style: TextStyle(
-        color: DbLensValueFormat.color(value, theme),
-        fontSize: DbLensTheme.dataFontSize,
-        fontStyle: value == null ? FontStyle.italic : FontStyle.normal,
-      ),
+      style: _valueStyle(theme, value, fontSize: 12, weight: FontWeight.w500),
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
+    );
+  }
+
+  Widget _renderFieldValue(BuildContext context, Object? value, DbLensTheme theme, {required bool isMatch}) {
+    if (widget.valueRenderer != null) {
+      return widget.valueRenderer!(context, value, theme);
+    }
+
+    final child = SelectableText(
+      DbLensValueFormat.format(value),
+      style: _valueStyle(theme, value, fontSize: 12),
+    );
+
+    if (!isMatch) return child;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+      decoration: BoxDecoration(
+        color: theme.accentSoft,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: child,
     );
   }
 
@@ -106,6 +216,13 @@ class _DbLensListCardState extends State<_DbLensListCard> {
         color: theme.bg,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: theme.border),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x08000000),
+            blurRadius: 4,
+            offset: Offset(0, 1),
+          ),
+        ],
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(10),
@@ -149,19 +266,16 @@ class _DbLensListCardState extends State<_DbLensListCard> {
             ),
             const SizedBox(width: 10),
             Expanded(child: _buildPreview(context, theme)),
-            if (widget.onCopyRow != null)
-              IconButton(
-                visualDensity: VisualDensity.compact,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                icon: Icon(Icons.copy_rounded, size: 15, color: theme.textMuted),
-                onPressed: () => widget.onCopyRow!(widget.row),
-                tooltip: 'Copy as JSON',
-              ),
+            IconButton(
+              visualDensity: VisualDensity.compact,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+              icon: Icon(Icons.copy_rounded, size: 15, color: theme.textMuted),
+              onPressed: () => _copyJson(context),
+              tooltip: 'Copy as JSON',
+            ),
             Icon(
-              _expanded
-                  ? Icons.keyboard_arrow_up_rounded
-                  : Icons.keyboard_arrow_down_rounded,
+              _expanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
               size: 20,
               color: theme.textMuted,
             ),
@@ -176,14 +290,16 @@ class _DbLensListCardState extends State<_DbLensListCard> {
     if (previewCols.isEmpty) {
       return Text('(empty)', style: TextStyle(color: theme.textMuted, fontSize: 12));
     }
+
     return Row(
       children: previewCols.map((col) {
+        final value = widget.row[col];
         return Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(col, style: TextStyle(color: theme.textMuted, fontSize: 10)),
-              _renderValue(context, widget.row[col], theme),
+              _renderPreviewValue(context, value, theme),
             ],
           ),
         );
@@ -192,48 +308,70 @@ class _DbLensListCardState extends State<_DbLensListCard> {
   }
 
   Widget _buildFields(BuildContext context, DbLensTheme theme) {
+    final q = widget.searchQuery.toLowerCase();
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
       child: Column(
         children: widget.columns.map((col) {
           final value = widget.row[col];
+          final isMatch = q.isNotEmpty && (value?.toString().toLowerCase().contains(q) ?? false);
           final editable = widget.canEditColumn?.call(col) ?? false;
+
           return Padding(
             padding: const EdgeInsets.symmetric(vertical: 4),
-            child: GestureDetector(
-              onLongPress: editable
-                  ? () => widget.onEditCell?.call(col, value, widget.row)
-                  : null,
-              behavior: HitTestBehavior.opaque,
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  SizedBox(
-                    width: 100,
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            col,
-                            style: TextStyle(
-                              color: theme.textMuted,
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.w500,
-                            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  width: 100,
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          col,
+                          style: TextStyle(
+                            color: theme.textMuted,
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w500,
                           ),
                         ),
-                        if (editable)
-                          Padding(
-                            padding: const EdgeInsets.only(left: 2),
-                            child: Icon(Icons.edit_rounded, size: 9, color: theme.accent),
-                          ),
-                      ],
+                      ),
+                      if (editable)
+                        Padding(
+                          padding: const EdgeInsets.only(left: 2),
+                          child: Icon(Icons.edit_rounded, size: 9, color: theme.accent),
+                        ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: GestureDetector(
+                    onLongPress: editable ? () => _editCell(context, col, value) : null,
+                    child: _renderFieldValue(context, value, theme, isMatch: isMatch),
+                  ),
+                ),
+                if (editable)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 4),
+                    child: InkWell(
+                      onTap: () => _editCell(context, col, value),
+                      borderRadius: BorderRadius.circular(6),
+                      child: Container(
+                        width: 26,
+                        height: 26,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: theme.surface,
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: theme.border),
+                        ),
+                        child: Icon(Icons.edit_rounded, size: 12, color: theme.accent),
+                      ),
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(child: _renderValue(context, value, theme)),
-                ],
-              ),
+              ],
             ),
           );
         }).toList(),

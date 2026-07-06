@@ -1,3 +1,10 @@
+## 1.0.2
+
+* **`DbLensListView`** — expandable row cards with search highlight, copy JSON, and built-in default cell edit (no `onEditCell` wiring required when a `DbLensControllerScope` ancestor exists).
+* **`DbLensCellEdit.run()`** — shared edit flow: dialog + save via `onSaveCell`, explicit controller, or nearest `DbLensControllerScope`.
+* **`DbLensCellEditor`** — redesigned dialog with type badge, SharedPreferences hint, type-aware validation, and `DbLensTheme`-based styling.
+* **`DbLensControllerScope.maybeOf()`** — non-throwing controller lookup for optional scope detection.
+
 ## 1.0.1
 
 * **Change history**: `DbLensHistoryHeader` split from `DbLensHistoryPanel` — optional `onBack` for full-page routes, search/filter toggle buttons in header (collapsed by default).

@@ -50,6 +50,9 @@ export 'presentation/state/db_lens_panel_models.dart';
 export 'presentation/theme/db_lens_theme.dart';
 export 'presentation/theme/db_lens_theme_data.dart';
 
+// ── Utils ────────────────────────────────────────────────────────────────
+export 'presentation/utils/db_lens_cell_edit.dart';
+
 // ── Pages ────────────────────────────────────────────────────────────────
 export 'presentation/pages/db_lens_panel.dart';
 

@@ -233,6 +233,13 @@ All widgets are headless/reusable and exported from `package:db_lens/db_lens.dar
 
 ## Cell editing
 
+In `DbLensListView`, expand a row card first. For editable columns (`canEditColumn` returns `true`):
+
+- **Long-press** the cell value, or
+- **Tap** the edit button on the right side of the row.
+
+When `onEditCell` is omitted, `DbLensCellEdit.run()` opens the default `DbLensCellEditor` dialog and saves via `onSaveCell`, an explicit `controller`, or the nearest `DbLensControllerScope`.
+
 `DbLensListView` opens the default edit dialog automatically when `canEditColumn` allows it and no custom `onEditCell` is provided — as long as a `DbLensControllerScope` ancestor exists:
 
 ```dart

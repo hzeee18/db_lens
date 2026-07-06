@@ -1,3 +1,7 @@
+## 1.0.3
+
+* **`DbLensListView`** — removed small edit icon beside column labels in expanded row cards for a cleaner UI; cell edit still works via long-press on the value or the edit button on the right.
+
 ## 1.0.2
 
 * **`DbLensListView`** — expandable row cards with search highlight, copy JSON, and built-in default cell edit (no `onEditCell` wiring required when a `DbLensControllerScope` ancestor exists).

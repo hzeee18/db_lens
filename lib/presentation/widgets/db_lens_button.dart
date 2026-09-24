@@ -34,7 +34,9 @@ class DbLensButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (kReleaseMode) return const SizedBox.shrink();
+    if (kReleaseMode && !(config?.allowInRelease ?? false)) {
+      return const SizedBox.shrink();
+    }
 
     return ElevatedButton.icon(
       onPressed: () => DbLens.open(context, config: config, theme: theme),

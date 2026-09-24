@@ -29,6 +29,14 @@ abstract class LensDataSource {
     Map<String, dynamic> row,
   );
 
+  /// Apakah engine ini mendukung penghapusan baris lewat [deleteRow].
+  bool get supportsRowDelete => false;
+
+  /// Hapus satu baris. Default: tidak didukung.
+  Future<void> deleteRow(String collection, Map<String, dynamic> row) {
+    throw UnsupportedError('Row deletion is not supported by this source.');
+  }
+
   /// Ambil semua baris (untuk ekspor).
   Future<List<Map<String, dynamic>>> allRows(String collection);
 

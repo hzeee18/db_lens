@@ -13,6 +13,7 @@ class DbLensConfig {
     this.historyPollInterval = defaultHistoryPollInterval,
     this.presentationMode = DbLensPresentationMode.bottomSheet,
     this.fullscreenDialog = true,
+    this.allowInRelease = false,
   }) : assert(
           pageSize >= 1 && pageSize <= maxPageSize,
           'pageSize must be between 1 and $maxPageSize',
@@ -35,4 +36,7 @@ class DbLensConfig {
 
   /// Only used when [presentationMode] is [DbLensPresentationMode.fullPage].
   final bool fullscreenDialog;
+
+  /// Izinkan [DbLens.open] di release build (mis. build QA). Default `false`.
+  final bool allowInRelease;
 }

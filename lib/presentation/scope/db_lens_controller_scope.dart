@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/models/db_lens_config.dart';
@@ -44,8 +43,8 @@ class DbLensControllerScope extends StatefulWidget {
 
   /// Ambil [DbLensController] dari scope terdekat di atas [context].
   static DbLensController of(BuildContext context) {
-    final scope =
-        context.dependOnInheritedWidgetOfExactType<_DbLensControllerInherited>();
+    final scope = context
+        .dependOnInheritedWidgetOfExactType<_DbLensControllerInherited>();
     assert(
       scope != null,
       'DbLensControllerScope.of() dipanggil tanpa ada DbLensControllerScope '
@@ -97,7 +96,8 @@ class _DbLensControllerScopeState extends State<DbLensControllerScope> {
 
   @override
   Widget build(BuildContext context) {
-    if (kReleaseMode) return const SizedBox.shrink();
+    // Release gating ada di DbLens.open / buildPanel / DbLensButton
+    // (lihat DbLensConfig.allowInRelease), bukan di scope.
     // Sengaja TIDAK dibungkus AnimatedBuilder/ListenableBuilder di sini —
     // scope cuma menyediakan controller, tidak ikut menentukan kapan
     // subtree rebuild. Widget daun (DbLensSourceList, dst.) yang

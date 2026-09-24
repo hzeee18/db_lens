@@ -13,6 +13,11 @@ abstract final class DbLensSqlUtils {
     caseSensitive: false,
   );
 
+  /// Buang spasi dan `;` di ujung. Query dibungkus `SELECT * FROM (...)`
+  /// untuk pagination/count, jadi `;` penutup akan membuatnya invalid.
+  static String stripTrailingSemicolons(String sql) =>
+      sql.replaceFirst(RegExp(r'[\s;]+$'), '');
+
   /// SELECT, read-only WITH/PRAGMA/EXPLAIN — dijalankan lewat jalur query
   /// berpaginasi, bukan [executeStatement].
   static bool isSelectQuery(String sql) {
@@ -80,7 +85,8 @@ abstract final class DbLensSqlUtils {
     if (!isSelectQuery(trimmed)) return true;
     if (_complexQueryPattern.hasMatch(trimmed)) return true;
     final withoutStrings = trimmed.replaceAll(RegExp(r"'[^']*'"), '');
-    if (RegExp(r'\(\s*select\b', caseSensitive: false).hasMatch(withoutStrings)) {
+    if (RegExp(r'\(\s*select\b', caseSensitive: false)
+        .hasMatch(withoutStrings)) {
       return true;
     }
     final fromMatches = _fromTablePattern.allMatches(withoutStrings).length;

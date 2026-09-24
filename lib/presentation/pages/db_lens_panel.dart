@@ -152,6 +152,8 @@ class _DbLensPanelSheetState extends State<_DbLensPanelSheet> {
       onCopied: () => _showSnackBar('Copied as JSON'),
       onSave: (updated) => c.updateRowFromJson(row, updated),
       onSaved: () => _showSnackBar('Row updated'),
+      onDelete: c.canDeleteRows ? () => c.deleteRow(row) : null,
+      onDeleted: () => _showSnackBar('Row deleted'),
     );
   }
 

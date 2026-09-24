@@ -50,6 +50,16 @@ abstract class LensRepository {
     Map<String, dynamic> row,
   );
 
+  /// Apakah sumber mendukung penghapusan baris.
+  bool supportsRowDelete(String sourceId);
+
+  /// Hapus satu baris (mis. satu key SharedPreferences).
+  Future<void> deleteRow(
+    String sourceId,
+    String collection,
+    Map<String, dynamic> row,
+  );
+
   /// Ambil semua baris untuk ekspor.
   Future<List<Map<String, dynamic>>> getAllRows(
     String sourceId,

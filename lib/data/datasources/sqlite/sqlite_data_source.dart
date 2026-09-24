@@ -2,6 +2,7 @@ import 'package:sqflite/sqflite.dart';
 
 import '../../../core/enums/source_type.dart';
 import '../../../core/utils/parse_utils.dart';
+import '../../../core/utils/sql_utils.dart';
 import '../sqlite/sql_queryable_data_source.dart';
 
 /// Implementasi [LensDataSource] untuk database SQLite (sqflite).
@@ -66,7 +67,8 @@ class SqliteDataSource implements SqlQueryableDataSource {
 
   @override
   Future<List<Map<String, dynamic>>> rawQuery(String sql) async {
-    final result = await _database.rawQuery(sql);
+    final result =
+        await _database.rawQuery(DbLensSqlUtils.stripTrailingSemicolons(sql));
     return result.map((row) => Map<String, dynamic>.from(row)).toList();
   }
 
@@ -77,7 +79,8 @@ class SqliteDataSource implements SqlQueryableDataSource {
     required int offset,
   }) async {
     final result = await _database.rawQuery(
-      'SELECT * FROM ($sql) LIMIT $limit OFFSET $offset',
+      'SELECT * FROM (${DbLensSqlUtils.stripTrailingSemicolons(sql)}) '
+      'LIMIT $limit OFFSET $offset',
     );
     return result.map((row) => Map<String, dynamic>.from(row)).toList();
   }
@@ -85,14 +88,15 @@ class SqliteDataSource implements SqlQueryableDataSource {
   @override
   Future<int> rawQueryCount(String sql) async {
     final result = await _database.rawQuery(
-      'SELECT COUNT(*) as count FROM ($sql)',
+      'SELECT COUNT(*) as count FROM '
+      '(${DbLensSqlUtils.stripTrailingSemicolons(sql)})',
     );
     return ParseUtils.asInt(result.first['count']);
   }
 
   @override
   Future<void> execute(String sql) async {
-    await _database.execute(sql);
+    await _database.execute(DbLensSqlUtils.stripTrailingSemicolons(sql));
   }
 
   @override
@@ -116,6 +120,14 @@ class SqliteDataSource implements SqlQueryableDataSource {
     final pkCols = await _pkColumns(collection);
     if (pkCols.isNotEmpty) return pkCols;
     return const ['_rowid_'];
+  }
+
+  @override
+  bool get supportsRowDelete => false;
+
+  @override
+  Future<void> deleteRow(String collection, Map<String, dynamic> row) {
+    throw UnsupportedError('Row deletion is not supported for SQLite.');
   }
 
   @override

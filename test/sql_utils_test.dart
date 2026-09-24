@@ -9,7 +9,8 @@ void main() {
         'users',
       );
       expect(
-        DbLensSqlUtils.extractSimpleFromTable('  select id from products where id = 1'),
+        DbLensSqlUtils.extractSimpleFromTable(
+            '  select id from products where id = 1'),
         'products',
       );
     });
@@ -35,12 +36,14 @@ void main() {
 
   group('DbLensSqlUtils.isComplexSelectQuery', () {
     test('simple query is not complex', () {
-      expect(DbLensSqlUtils.isComplexSelectQuery('SELECT * FROM users'), isFalse);
+      expect(
+          DbLensSqlUtils.isComplexSelectQuery('SELECT * FROM users'), isFalse);
     });
 
     test('JOIN is complex', () {
       expect(
-        DbLensSqlUtils.isComplexSelectQuery('SELECT * FROM a JOIN b ON a.id = b.id'),
+        DbLensSqlUtils.isComplexSelectQuery(
+            'SELECT * FROM a JOIN b ON a.id = b.id'),
         isTrue,
       );
     });
@@ -66,11 +69,29 @@ void main() {
     });
 
     test('mutating PRAGMA is not select', () {
-      expect(DbLensSqlUtils.isSelectQuery('PRAGMA journal_mode = WAL'), isFalse);
+      expect(
+          DbLensSqlUtils.isSelectQuery('PRAGMA journal_mode = WAL'), isFalse);
     });
 
     test('read-only PRAGMA is select', () {
       expect(DbLensSqlUtils.isSelectQuery('PRAGMA table_info(users)'), isTrue);
+    });
+  });
+
+  group('stripTrailingSemicolons', () {
+    test('removes trailing semicolons and whitespace', () {
+      expect(
+        DbLensSqlUtils.stripTrailingSemicolons('SELECT * FROM users; \n'),
+        'SELECT * FROM users',
+      );
+      expect(DbLensSqlUtils.stripTrailingSemicolons('SELECT 1;;'), 'SELECT 1');
+    });
+
+    test('keeps semicolons inside the statement', () {
+      expect(
+        DbLensSqlUtils.stripTrailingSemicolons("SELECT ';' AS s"),
+        "SELECT ';' AS s",
+      );
     });
   });
 }

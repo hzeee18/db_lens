@@ -16,6 +16,8 @@ class DbLensRowJsonSheet extends StatefulWidget {
     this.onCopied,
     this.onSave,
     this.onSaved,
+    this.onDelete,
+    this.onDeleted,
   });
 
   final Map<String, Object?> row;
@@ -26,6 +28,11 @@ class DbLensRowJsonSheet extends StatefulWidget {
   final Future<String?> Function(Map<String, Object?> updatedRow)? onSave;
   final VoidCallback? onSaved;
 
+  /// Menghapus baris; mengembalikan pesan error atau null jika sukses.
+  /// Tombol Hapus hanya tampil jika diisi.
+  final Future<String?> Function()? onDelete;
+  final VoidCallback? onDeleted;
+
   static Future<void> show(
     BuildContext context, {
     required Map<String, Object?> row,
@@ -35,6 +42,8 @@ class DbLensRowJsonSheet extends StatefulWidget {
     VoidCallback? onCopied,
     Future<String?> Function(Map<String, Object?> updatedRow)? onSave,
     VoidCallback? onSaved,
+    Future<String?> Function()? onDelete,
+    VoidCallback? onDeleted,
   }) {
     return showModalBottomSheet<void>(
       context: context,
@@ -52,6 +61,8 @@ class DbLensRowJsonSheet extends StatefulWidget {
           onCopied: onCopied,
           onSave: onSave,
           onSaved: onSaved,
+          onDelete: onDelete,
+          onDeleted: onDeleted,
         ),
       ),
     );
@@ -159,6 +170,53 @@ class _DbLensRowJsonSheetState extends State<DbLensRowJsonSheet> {
     Navigator.pop(context);
   }
 
+  Future<void> _confirmDelete() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: widget.theme.bg,
+        title: Text(
+          'Delete row?',
+          style: TextStyle(color: widget.theme.textPrimary, fontSize: 16),
+        ),
+        content: Text(
+          'This row will be permanently removed. This cannot be undone.',
+          style: TextStyle(color: widget.theme.textMuted, fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.redAccent),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() {
+      _isSaving = true;
+      _inlineError = null;
+    });
+    final error = await widget.onDelete!();
+    if (!mounted) return;
+
+    if (error != null) {
+      setState(() {
+        _isSaving = false;
+        _inlineError = error;
+      });
+      return;
+    }
+
+    widget.onDeleted?.call();
+    Navigator.pop(context);
+  }
+
   @override
   Widget build(BuildContext context) {
     final maxHeight = MediaQuery.sizeOf(context).height * 0.75;
@@ -238,6 +296,13 @@ class _DbLensRowJsonSheetState extends State<DbLensRowJsonSheet> {
               onPressed: _enterEditMode,
               icon: Icon(Icons.edit_outlined,
                   size: 20, color: widget.theme.accent),
+            ),
+          if (widget.onDelete != null && !_isEditing)
+            IconButton(
+              tooltip: 'Delete',
+              onPressed: _isSaving ? null : _confirmDelete,
+              icon: const Icon(Icons.delete_outline,
+                  size: 20, color: Colors.redAccent),
             ),
           IconButton(
             tooltip: 'Close',

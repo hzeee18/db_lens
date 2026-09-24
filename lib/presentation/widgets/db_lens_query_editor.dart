@@ -80,6 +80,58 @@ class _DbLensQueryEditorState extends State<DbLensQueryEditor> {
     await c.runQuery();
   }
 
+  /// Sisipkan [name] di posisi kursor (atau ganti seleksi).
+  void _insertTableName(String name) {
+    final text = _queryController.text;
+    final sel = _queryController.selection;
+    final start = sel.start < 0 ? text.length : sel.start;
+    final end = sel.end < 0 ? text.length : sel.end;
+    _queryController.value = TextEditingValue(
+      text: text.replaceRange(start, end, name),
+      selection: TextSelection.collapsed(offset: start + name.length),
+    );
+    setState(() {});
+  }
+
+  Widget _buildTableChips(DbLensController c, DbLensTheme theme) {
+    final tables = c.source.collections;
+    if (tables.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            Text(
+              'Tables:',
+              style: TextStyle(
+                color: theme.textMuted,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(width: 8),
+            for (final name in tables)
+              Padding(
+                padding: const EdgeInsets.only(right: 6),
+                child: ActionChip(
+                  visualDensity: VisualDensity.compact,
+                  avatar: Icon(Icons.table_rows_outlined,
+                      size: 12, color: theme.accent),
+                  label: Text(
+                    name,
+                    style:
+                        const TextStyle(fontFamily: 'monospace', fontSize: 11),
+                  ),
+                  onPressed: () => _insertTableName(name),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _clear(DbLensController c) {
     if (c.query.queryMode) {
       c.restoreTableView();
@@ -127,7 +179,8 @@ class _DbLensQueryEditorState extends State<DbLensQueryEditor> {
                     ),
                     TextButton(
                       onPressed: c.query.toggleExpanded,
-                      child: Text(c.query.queryExpanded ? 'Collapse' : 'Expand'),
+                      child:
+                          Text(c.query.queryExpanded ? 'Collapse' : 'Expand'),
                     ),
                   ],
                 ),
@@ -139,10 +192,13 @@ class _DbLensQueryEditorState extends State<DbLensQueryEditor> {
                     maxLines: 6,
                     onChanged: (_) => setState(() {}),
                     decoration: theme
-                        .fieldDecoration(hintText: widget.hintText, fillColor: theme.bg)
+                        .fieldDecoration(
+                            hintText: widget.hintText, fillColor: theme.bg)
                         .copyWith(contentPadding: const EdgeInsets.all(12)),
-                    style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+                    style:
+                        const TextStyle(fontFamily: 'monospace', fontSize: 12),
                   ),
+                  _buildTableChips(c, theme),
                   const SizedBox(height: 8),
                   Wrap(
                     alignment: WrapAlignment.spaceBetween,
@@ -176,8 +232,10 @@ class _DbLensQueryEditorState extends State<DbLensQueryEditor> {
                                       color: Colors.white,
                                     ),
                                   )
-                                : const Icon(Icons.play_arrow_rounded, size: 18),
-                            label: Text(c.query.runningQuery ? 'Running' : 'Run'),
+                                : const Icon(Icons.play_arrow_rounded,
+                                    size: 18),
+                            label:
+                                Text(c.query.runningQuery ? 'Running' : 'Run'),
                           ),
                         ],
                       ),
@@ -229,7 +287,8 @@ class _DbLensQueryEditorState extends State<DbLensQueryEditor> {
             Expanded(
               child: Text(
                 message,
-                style: TextStyle(color: theme.textSecondary, fontSize: 12, height: 1.35),
+                style: TextStyle(
+                    color: theme.textSecondary, fontSize: 12, height: 1.35),
               ),
             ),
           ],

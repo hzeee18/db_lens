@@ -41,6 +41,29 @@ class DbLensEditController extends ChangeNotifier {
     }
   }
 
+  /// Hapus satu baris. Mengembalikan pesan error atau null jika sukses.
+  Future<String?> deleteRow({
+    required String sourceId,
+    required String collection,
+    required Map<String, Object?> row,
+  }) async {
+    busy = true;
+    lastError = null;
+    notifyListeners();
+    try {
+      await _repository.deleteRow(sourceId, collection, row);
+      busy = false;
+      notifyListeners();
+      return null;
+    } catch (error) {
+      busy = false;
+      final message = 'Failed to delete row: $error';
+      lastError = message;
+      notifyListeners();
+      return message;
+    }
+  }
+
   /// Perbarui baris dari map JSON hasil edit. Mengembalikan pesan error
   /// atau null jika sukses.
   Future<String?> updateRowFromJson({

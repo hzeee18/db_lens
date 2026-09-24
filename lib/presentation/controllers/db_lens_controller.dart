@@ -57,8 +57,11 @@ class DbLensController extends ChangeNotifier {
   /// Error terbaru dari salah satu sub-controller (untuk ditampilkan sekali
   /// lewat snackbar lalu di-clear). Set null untuk clear semuanya.
   String? get lastError =>
-      source.lastError ?? table.lastError ?? edit.lastError ??
-      browse.lastError ?? _copyError;
+      source.lastError ??
+      table.lastError ??
+      edit.lastError ??
+      browse.lastError ??
+      _copyError;
 
   set lastError(String? value) {
     source.lastError = value;
@@ -193,6 +196,29 @@ class DbLensController extends ChangeNotifier {
     return ok;
   }
 
+  bool get canDeleteRows {
+    final sourceId = source.selectedSourceId;
+    return canEditCells &&
+        sourceId != null &&
+        _repository.supportsRowDelete(sourceId);
+  }
+
+  Future<String?> deleteRow(Map<String, Object?> row) async {
+    final sourceId = source.selectedSourceId;
+    final collection = source.selectedCollection;
+    if (sourceId == null || collection == null || !canDeleteRows) {
+      return 'Deleting is not available in this view.';
+    }
+
+    final error = await edit.deleteRow(
+      sourceId: sourceId,
+      collection: collection,
+      row: row,
+    );
+    if (error == null) await table.refresh();
+    return error;
+  }
+
   Future<String?> updateRowFromJson(
     Map<String, Object?> originalRow,
     Map<String, Object?> updatedRow,
@@ -231,7 +257,8 @@ class DbLensController extends ChangeNotifier {
       final sql = query.queryText.trim();
       final total = await _repository.runRawQueryCount(sourceId, sql);
       if (total == 0) return [];
-      return _repository.runRawQueryPaged(sourceId, sql, limit: total, offset: 0);
+      return _repository.runRawQueryPaged(sourceId, sql,
+          limit: total, offset: 0);
     }
 
     final collection = source.selectedCollection;

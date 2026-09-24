@@ -101,7 +101,8 @@ class SharedPreferencesDataSource implements LensDataSource {
     final expectedType = row['type'] as String?;
 
     if (column == 'type') {
-      throw ArgumentError('Cannot change the type field (expected "$expectedType").');
+      throw ArgumentError(
+          'Cannot change the type field (expected "$expectedType").');
     }
 
     if (column == 'key') {
@@ -154,6 +155,16 @@ class SharedPreferencesDataSource implements LensDataSource {
     return value.runtimeType.toString();
   }
 
+  @override
+  bool get supportsRowDelete => true;
+
+  @override
+  Future<void> deleteRow(String collection, Map<String, dynamic> row) async {
+    final key = row['key'] as String?;
+    if (key == null || key.isEmpty) throw ArgumentError('Row has no key.');
+    await _preferences.remove(key);
+  }
+
   Future<void> _setValue(String key, Object? newValue, String type) async {
     switch (type) {
       case 'bool':
@@ -163,7 +174,8 @@ class SharedPreferencesDataSource implements LensDataSource {
       case 'double':
         await _preferences.setDouble(key, newValue as double);
       case 'StringList':
-        await _preferences.setStringList(key, List<String>.from(newValue as List));
+        await _preferences.setStringList(
+            key, List<String>.from(newValue as List));
       case 'String':
       default:
         await _preferences.setString(key, newValue?.toString() ?? '');

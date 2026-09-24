@@ -120,6 +120,19 @@ class LensRepositoryImpl implements LensRepository {
   }
 
   @override
+  bool supportsRowDelete(String sourceId) =>
+      _requireSource(sourceId).supportsRowDelete;
+
+  @override
+  Future<void> deleteRow(
+    String sourceId,
+    String collection,
+    Map<String, dynamic> row,
+  ) {
+    return _requireSource(sourceId).deleteRow(collection, row);
+  }
+
+  @override
   Future<List<Map<String, dynamic>>> getAllRows(
     String sourceId,
     String collection,

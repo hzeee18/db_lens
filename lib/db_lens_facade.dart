@@ -14,6 +14,7 @@ import 'data/repositories/lens_repository_impl.dart';
 import 'domain/repositories/lens_repository.dart';
 import 'presentation/controllers/db_lens_controller.dart';
 import 'presentation/controllers/db_lens_history_controller.dart';
+import 'presentation/browser/db_lens_browser_page.dart';
 import 'presentation/pages/db_lens_panel.dart';
 import 'presentation/theme/db_lens_theme.dart';
 import 'presentation/theme/db_lens_theme_data.dart';
@@ -128,15 +129,15 @@ class DbLens {
 
   // ── 3. Compose widget ───────────────────────────────────────────────────
 
-  /// Open the built-in DbLens panel. Tidak berjalan di release build.
+  /// Open the built-in DbLens panel. Tidak berjalan di release build kecuali [DbLensConfig.allowInRelease].
   static Future<void> open(
     BuildContext context, {
     DbLensConfig? config,
     DbLensThemeData? theme,
   }) async {
-    if (kReleaseMode) return;
-
     final panelConfig = config ?? const DbLensConfig();
+    if (kReleaseMode && !panelConfig.allowInRelease) return;
+
     final panelTheme = DbLensTheme(theme);
 
     switch (panelConfig.presentationMode) {
@@ -171,6 +172,17 @@ class DbLens {
     }
   }
 
+  /// Buka browser database full-page (tampilan kartu per-row, query console
+  /// dengan chip tabel, hapus key SharedPreferences). Tidak berjalan di
+  /// release build kecuali [allowInRelease] true.
+  static Future<void> openBrowser(
+    BuildContext context, {
+    bool allowInRelease = false,
+  }) async {
+    if (kReleaseMode && !allowInRelease) return;
+    await openDbLensBrowserPage(context);
+  }
+
   /// Widget inspector yang bisa di-embed di widget tree konsumen (mis. tab
   /// debug/QA aplikasi sendiri) — tanpa navigasi.
   static Widget buildPanel({
@@ -178,9 +190,10 @@ class DbLens {
     DbLensThemeData? theme,
     DbLensController? controller,
   }) {
-    if (kReleaseMode) return const SizedBox.shrink();
-
     final panelConfig = config ?? const DbLensConfig();
+    if (kReleaseMode && !panelConfig.allowInRelease) {
+      return const SizedBox.shrink();
+    }
 
     return DbLensThemeScope(
       theme: DbLensTheme(theme),

@@ -1,3 +1,12 @@
+## 1.1.0
+
+* **`DbLens.openBrowser`** — full-page database browser (source list, expandable row cards, cell edit dialog, raw SQL console).
+* **Delete SharedPreferences keys** — `LensDataSource.supportsRowDelete` / `deleteRow`, `LensRepository.deleteRow`, `DbLensController.deleteRow`; delete button + confirmation in the browser and in `DbLensRowJsonSheet` (`onDelete`).
+* **Table chips** in `DbLensQueryEditor` — tap to insert a table name at the cursor.
+* **`DbLensConfig.allowInRelease`** — allow `DbLens.open` / `buildPanel` / `DbLensButton` in release builds (default `false`). `DbLensControllerScope` no longer hides itself in release.
+* Trailing `;` in raw SQL queries no longer breaks pagination/count (`DbLensSqlUtils.stripTrailingSemicolons`).
+* **Note for custom sources:** `LensDataSource` and `LensRepository` gained members; classes that `implements` them must add `supportsRowDelete` / `deleteRow` (or `extends` `LensDataSource` where possible).
+
 ## 1.0.4
 
 * **`DbLensQueryConsole`** — full-page SQL console widget (dark editor, table chips, session history, result grid with CSV/JSON copy). Works standalone via `DbLens.runRawQuery` / `DbLens.executeStatement` — no `DbLensController` required. Open with `DbLensQueryConsole.push(context, source: ..., tableNames: ...)`.

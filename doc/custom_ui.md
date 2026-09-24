@@ -204,7 +204,8 @@ All widgets are headless/reusable and exported from `package:db_lens/db_lens.dar
 | `DbLensSearchBar` | Search input with clear button |
 | `DbLensToolbar` | Toolbar slot |
 | `DbLensRefreshAction` | Refresh icon button |
-| `DbLensQueryEditor` | SQL input with history |
+| `DbLensQueryEditor` | Inline SQL input with history (embedded in browse view) |
+| `DbLensQueryConsole` | Full-page SQL console — editor, history, result grid |
 | `DbLensQueryHistoryList` | Session SQL history list |
 | `DbLensCellEditor` | Type-aware cell edit dialog (type badge, validation) |
 | `DbLensPaginationBar` | Page navigation |
@@ -232,6 +233,13 @@ All widgets are headless/reusable and exported from `package:db_lens/db_lens.dar
 ---
 
 ## Cell editing
+
+In `DbLensListView`, expand a row card first. For editable columns (`canEditColumn` returns `true`):
+
+- **Long-press** the cell value, or
+- **Tap** the edit button on the right side of the row.
+
+When `onEditCell` is omitted, `DbLensCellEdit.run()` opens the default `DbLensCellEditor` dialog and saves via `onSaveCell`, an explicit `controller`, or the nearest `DbLensControllerScope`.
 
 `DbLensListView` opens the default edit dialog automatically when `canEditColumn` allows it and no custom `onEditCell` is provided — as long as a `DbLensControllerScope` ancestor exists:
 
@@ -280,6 +288,40 @@ await DbLens.executeStatement('Main DB', 'DELETE FROM users WHERE id = 1');
 ```
 
 The `source` parameter accepts either `sourceId` or `sourceName`.
+
+---
+
+## Query Console (full page)
+
+Use **`DbLensQueryConsole`** when you want a dedicated SQL console screen — not the inline `DbLensQueryEditor` embedded in a table view.
+
+Features: dark SQL editor (collapsible), table name chips, example queries, session history (`DbLensQueryHistoryController`), result grid (`DbLensDataGrid`), CSV/JSON copy, and mutation confirmation for non-SELECT statements.
+
+No controller needed — calls `DbLens.runRawQuery` / `DbLens.executeStatement` directly:
+
+```dart
+// Open as a full-page route (theme + back button handled internally)
+DbLensQueryConsole.push(
+  context,
+  source: 'Main DB',              // sourceId or sourceName
+  tableNames: ['users', 'orders'], // optional — table chips + example queries
+);
+```
+
+Embed manually if you already have a `Navigator` route:
+
+```dart
+DbLensThemeScope(
+  theme: DbLensTheme(DbLensThemeData.fromMaterialTheme(Theme.of(context))),
+  child: DbLensQueryConsole(
+    source: 'Main DB',
+    tableNames: tableNames,
+    onBack: () => Navigator.pop(context),
+  ),
+)
+```
+
+Optional: pass a shared `historyController` or custom `confirmBuilder` (same signature as `DbLensQueryEditor`).
 
 ---
 
@@ -363,4 +405,5 @@ The `example/` app demonstrates every pattern:
 | `presentation_modes_screen.dart` | `DbLensConfig.presentationMode` |
 | `embedded_panel_screen.dart` | `DbLens.buildPanel()` |
 | `custom_ui_screen.dart` | `DbLensControllerScope` + public widgets, shared controller across routes |
+| `query_console_screen.dart` | `DbLensQueryConsole.push()` — standalone SQL console without controller |
 | `history_demo_screen.dart` | `configureHistory`, `createHistoryController`, `DbLensHistoryHeader`, `DbLensHistorySheet` |

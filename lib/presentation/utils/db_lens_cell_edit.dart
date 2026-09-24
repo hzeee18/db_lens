@@ -4,6 +4,7 @@ import '../../core/enums/source_type.dart';
 import '../controllers/db_lens_controller.dart';
 import '../hooks/db_lens_cell_editor_builder.dart';
 import '../scope/db_lens_controller_scope.dart';
+import '../theme/db_lens_theme.dart';
 import '../widgets/db_lens_cell_editor.dart';
 import 'db_lens_snackbar.dart';
 
@@ -22,6 +23,7 @@ abstract final class DbLensCellEdit {
     String failureMessage = 'Update failed',
   }) async {
     final sqlite = isSQLite ?? _inferIsSQLite(context, controller);
+    final theme = DbLensThemeScope.of(context);
 
     Object? newValue;
     try {
@@ -30,6 +32,7 @@ abstract final class DbLensCellEdit {
         column,
         currentValue,
         isSQLite: sqlite,
+        theme: theme,
       );
     } on DbLensCellEditCancelled {
       return;

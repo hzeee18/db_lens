@@ -9,7 +9,7 @@ class DbLensConfig {
   const DbLensConfig({
     this.pageSize = defaultPageSize,
     this.enablePrefetch = true,
-    this.enableHistory = true,
+    this.enableHistory = false,
     this.historyPollInterval = defaultHistoryPollInterval,
     this.presentationMode = DbLensPresentationMode.bottomSheet,
     this.fullscreenDialog = true,
@@ -25,7 +25,9 @@ class DbLensConfig {
   /// Prefetch halaman berikutnya di background.
   final bool enablePrefetch;
 
-  /// Aktifkan pelacakan riwayat perubahan data (nonaktif di release build).
+  /// Tidak mengatur tracker riwayat — polling dinyalakan lewat
+  /// `DbLens.configureHistory(enabled: true)` (default mati, dan selalu mati
+  /// di release build).
   final bool enableHistory;
 
   /// Interval polling untuk deteksi perubahan data.

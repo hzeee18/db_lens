@@ -40,7 +40,9 @@ class DbLens {
     historyDataSource: kReleaseMode ? null : _historyDataSource,
     historyRepository: kReleaseMode ? null : _historyRepository,
     pollInterval: DbLensConfig.defaultHistoryPollInterval,
-    enableHistory: !kReleaseMode,
+    // Off by default: the tracker polls every row of every collection.
+    // Opt in with `DbLens.configureHistory(enabled: true)`.
+    enableHistory: false,
   );
 
   static final LensRepository _repository = LensRepositoryImpl(_registry);

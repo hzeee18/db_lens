@@ -2,7 +2,7 @@
 
 A Flutter **Database Inspector Framework** for inspecting SQLite and SharedPreferences directly on device — no adb, no external tools, no laptop needed.
 
-> Designed for QA and developers. Works out of the box (`DbLens.open()`), or compose your own UI from headless controllers and reusable widgets. Hidden in release builds (`kReleaseMode`).
+> Designed for QA and developers. Works out of the box (`DbLens.open()`), or compose your own UI from headless controllers and reusable widgets. Hidden in release builds (`kReleaseMode`) unless you opt in with `DbLensConfig.allowInRelease` (e.g. QA builds).
 
 ---
 
@@ -18,7 +18,7 @@ A Flutter **Database Inspector Framework** for inspecting SQLite and SharedPrefe
 
 ```yaml
 dev_dependencies:
-  db_lens: ^1.0.2
+  db_lens: ^1.2.0
 ```
 
 ---
@@ -40,13 +40,34 @@ DbLens.registerSharedPreferences('App Prefs', prefs);
 
 // Open the built-in inspector (bottom sheet by default)
 DbLens.open(context);
+
+// Or the full-page database browser
+DbLens.openBrowser(context);
 ```
+
+---
+
+## Database Browser
+
+`DbLens.openBrowser(context)` opens a full-page browser: source list, expandable row cards, cell editing, and a raw SQL console.
+
+```dart
+DbLens.openBrowser(context);
+
+// QA / release builds: opt in explicitly (hidden in release by default)
+DbLens.openBrowser(context, allowInRelease: true);
+```
+
+- **Delete a SharedPreferences key** — trash icon on the row card, with a confirmation dialog. SQLite sources don't expose row deletion.
+- **SQL console** — SQLite only. Tap a table chip to insert its name at the cursor. A trailing `;` is fine.
+- The browser uses a fixed palette; `DbLensThemeData` applies to `DbLens.open` / the panel, not to the browser.
+- Custom sources: `LensDataSource.supportsRowDelete` / `deleteRow` let your own source opt in to deletion.
 
 ---
 
 ## DbLensButton
 
-Drop it anywhere — app bar, drawer, debug menu, settings page. Automatically hidden in release builds.
+Drop it anywhere — app bar, drawer, debug menu, settings page. Automatically hidden in release builds unless `config: DbLensConfig(allowInRelease: true)`.
 
 ```dart
 DbLensButton()
@@ -167,10 +188,15 @@ Switch between sources inside the panel. Search and filter source and collection
 
 Track insert/update/delete changes across registered collections (debug builds only).
 
+> **Off by default.** The tracker polls every row of every collection on a timer, which is expensive. Turn it on only when you need it, ideally *before* registering sources.
+
 Compose the header and panel separately — the header owns navigation, search/filter toggles, tracking, and clear; the panel owns the entry list.
 
 ```dart
-DbLens.configureHistory(pollInterval: const Duration(seconds: 5));
+DbLens.configureHistory(
+  enabled: true,
+  pollInterval: const Duration(seconds: 5),
+);
 
 final historyController = DbLens.createHistoryController();
 await historyController.loadFor(sourceId);
@@ -238,12 +264,14 @@ historyController.dispose();
 | 📋 | Tap row → JSON bottom sheet; long-press → copy or edit cell |
 | ✏️ | Edit cell values (SQLite `UPDATE` / SharedPreferences `set*`) |
 | 📤 | Copy all rows as JSON |
-| 📜 | Change history with diff view, filters, and copy JSON (polling-based) |
+| 🗑️ | Delete SharedPreferences keys (browser row card, `DbLensRowJsonSheet.onDelete`) |
+| 🧭 | Full-page browser via `DbLens.openBrowser` with table chips in the SQL console |
+| 📜 | Change history with diff view, filters, and copy JSON (polling-based, opt-in) |
 | 🧩 | Headless controllers + reusable widget library for custom UI |
 | 🎨 | `DbLensThemeData` — customizable panel colors |
 | 🔄 | Refresh on demand |
 | 💾 | Multiple source support |
-| 🔒 | No-op in release builds |
+| 🔒 | No-op in release builds unless `allowInRelease` |
 
 ---
 
@@ -255,8 +283,8 @@ DbLens.open(
   config: const DbLensConfig(
     pageSize: 20,
     enablePrefetch: true,
-    enableHistory: true,
     historyPollInterval: Duration(seconds: 5),
+    allowInRelease: false,
     presentationMode: DbLensPresentationMode.bottomSheet,
   ),
 );

@@ -391,7 +391,7 @@ await DbLensHistorySheet.show(
 historyController.dispose();
 ```
 
-Filters (table + `insert` / `update` / `delete`) live on `DbLensHistoryController`. History tracking uses polling (`CollectionChangeTracker`) and is disabled in release builds.
+Filters (table + `insert` / `update` / `delete`) live on `DbLensHistoryController`. History tracking uses polling (`CollectionChangeTracker`), is **off by default** (enable with `DbLens.configureHistory(enabled: true)`), and is always disabled in release builds.
 
 ---
 

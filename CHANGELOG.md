@@ -1,3 +1,9 @@
+## 1.2.0
+
+* **Change history is now off by default.** The tracker polls every row of every collection on a timer, so it no longer starts when a source is registered. Opt in with `DbLens.configureHistory(enabled: true)` (debug builds only, as before).
+* `DbLensConfig.enableHistory` now defaults to `false`; it does not start the tracker by itself — use `DbLens.configureHistory`.
+* README updated for `DbLens.openBrowser`, `allowInRelease`, row deletion and table chips.
+
 ## 1.1.0
 
 * **`DbLens.openBrowser`** — full-page database browser (source list, expandable row cards, cell edit dialog, raw SQL console).

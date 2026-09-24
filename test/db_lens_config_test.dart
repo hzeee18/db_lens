@@ -11,4 +11,13 @@ void main() {
     const config = DbLensConfig();
     expect(config.fullscreenDialog, isTrue);
   });
+
+  test('DbLensConfig.enableHistory defaults to false', () {
+    const config = DbLensConfig();
+    expect(config.enableHistory, isFalse);
+  });
+
+  test('history tracking is off by default until configureHistory', () {
+    expect(DbLens.registry.enableHistory, isFalse);
+  });
 }

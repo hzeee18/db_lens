@@ -14,7 +14,7 @@ class DbLensRegistry {
     HistoryDataSource? historyDataSource,
     HistoryRepositoryImpl? historyRepository,
     Duration pollInterval = const Duration(seconds: 5),
-    bool enableHistory = true,
+    bool enableHistory = false,
   })  : _historyDataSource = historyDataSource,
         _historyRepository = historyRepository,
         _pollInterval = pollInterval,
